@@ -31,7 +31,7 @@ jobs:
       - name: Yeni mesaj var mı kontrol et, varsa ara ve cevapla
         env:
           LAPTOP_TELEGRAM_BOT_TOKEN: ${{ secrets.LAPTOP_TELEGRAM_BOT_TOKEN }}
-          LAPTOP_TELEGRAM_FRIEND_CHAT_ID: ${{ secrets.LAPTOP_TELEGRAM_FRIEND_CHAT_ID }}
+          LAPTOP_TELEGRAM_ALLOWED_CHAT_IDS: ${{ secrets.LAPTOP_TELEGRAM_ALLOWED_CHAT_IDS }}
         run: python laptop-arama/telegram_bot.py
 
       - name: Mesaj takip noktasını (offset) repoya geri kaydet

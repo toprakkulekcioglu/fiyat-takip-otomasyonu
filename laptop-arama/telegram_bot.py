@@ -1,13 +1,15 @@
-"""Arkadaşın Telegram'dan bu bota herhangi bir mesaj attığında RTX 5070 Ti laptop
-fiyatlarını arayıp ona geri gönderen "bot".
+"""Telegram'dan bu bota (sen veya arkadaşın) herhangi bir mesaj atıldığında RTX
+5070 Ti laptop fiyatlarını arayıp mesajı atana geri gönderen "bot".
 
 Sürekli açık bir sunucu DEĞİL - GitHub Actions sık aralıklarla (örn. her 5 dakikada
 bir) bu script'i çalıştırıp Telegram'a "yeni mesaj var mı?" diye soruyor (polling).
 Gerçek zamanlı değil ama birkaç dakika içinde cevap gelir - 7/24 açık bir sunucu
 kurmadan (ki bu ücretsiz/basit değil) yapılabilecek en pratik yöntem bu.
 
-Güvenlik: sadece LAPTOP_TELEGRAM_FRIEND_CHAT_ID'de tanımlı kişiye cevap verir -
-botun linkini/kullanıcı adını bulan başka biri yazarsa sessizce yok sayılır.
+Güvenlik: sadece LAPTOP_TELEGRAM_ALLOWED_CHAT_IDS listesindeki kişilere cevap
+verir - botun linkini/kullanıcı adını bulan başka biri yazarsa sessizce yok
+sayılır. Bir Telegram kullanıcısının chat_id'si hangi bota yazdığından bağımsız
+sabittir - aynı hesap farklı botlara aynı chat_id ile görünür.
 """
 import os
 import sys
@@ -24,7 +26,9 @@ from search_laptops import search
 load_dotenv()
 
 BOT_TOKEN = os.environ["LAPTOP_TELEGRAM_BOT_TOKEN"]
-FRIEND_CHAT_ID = os.environ["LAPTOP_TELEGRAM_FRIEND_CHAT_ID"]
+ALLOWED_CHAT_IDS = {
+    cid.strip() for cid in os.environ["LAPTOP_TELEGRAM_ALLOWED_CHAT_IDS"].split(",") if cid.strip()
+}
 API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
 OFFSET_FILE = Path(__file__).parent / "last_update_id.txt"
 
@@ -67,7 +71,7 @@ def run() -> None:
             continue
 
         chat_id = str(message["chat"]["id"])
-        if chat_id != FRIEND_CHAT_ID:
+        if chat_id not in ALLOWED_CHAT_IDS:
             print(f"Tanınmayan chat_id ({chat_id}) - yok sayıldı.")
             continue
 
