@@ -1,4 +1,5 @@
 """n11.com kategori sayfalarından SSD ürünlerini çeker (sunucu tarafında render ediliyor, JS gerekmiyor)."""
+import time
 from urllib.parse import urljoin
 
 import requests
@@ -49,6 +50,7 @@ def scrape_all() -> list[dict]:
     results = []
     for capacity in URLS:
         results.extend(scrape(capacity))
+        time.sleep(2)
     return results
 
 
