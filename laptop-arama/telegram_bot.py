@@ -1,5 +1,6 @@
-"""Telegram'dan bu bota (sen veya arkadaşın) herhangi bir mesaj atıldığında RTX
-5070 Ti laptop fiyatlarını arayıp mesajı atana geri gönderen "bot".
+"""Telegram'dan bu bota (sen veya arkadaşın) herhangi bir mesaj atıldığında,
+Türkiye'de VE yurtdışında (PriceRunner UK üzerinden Avrupa) satılan, eşleşen RTX
+5070 Ti laptopları bulup fiyatlarını (güncel kurla) karşılaştırıp geri gönderen "bot".
 
 Sürekli açık bir sunucu DEĞİL - GitHub Actions sık aralıklarla (örn. her 5 dakikada
 bir) bu script'i çalıştırıp Telegram'a "yeni mesaj var mı?" diye soruyor (polling).
@@ -20,8 +21,12 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
+from currency import gbp_to_try_rate
+from manis import rastgele_mani
+from matcher import match
 from notifier import load_dotenv
-from search_laptops import search
+from search_laptops import search as search_global
+from search_laptops_tr import search as search_tr
 
 load_dotenv()
 
@@ -48,12 +53,30 @@ def send_message(chat_id: str, text: str) -> None:
     requests.post(f"{API_BASE}/sendMessage", data={"chat_id": chat_id, "text": text}, timeout=20)
 
 
-def format_results(laptops: list[dict]) -> str:
-    if not laptops:
-        return "Şu an RTX 5070 Ti laptop bulunamadı (kaynak geçici olarak erişilemez olabilir)."
-    lines = ["RTX 5070 Ti laptop fiyatları - Avrupa (PriceRunner UK), ucuzdan pahalıya:"]
-    for laptop in laptops[:10]:
-        lines.append(f"\n£{laptop['price_gbp']:,.2f}  ({laptop['stores']})  {laptop['name']}\n{laptop['url']}")
+def format_results(pairs: list[dict], rate: float) -> str:
+    lines = [rastgele_mani(), ""]
+
+    if not pairs:
+        lines.append(
+            "Şu an Türkiye ve yurtdışı kataloglarında güvenle eşleştirilebilen "
+            "(aynı model, sadece farklı ülke) bir RTX 5070 Ti laptop bulunamadı - "
+            "GPU çok yeni, kataloglar henüz örtüşmüyor olabilir."
+        )
+        return "\n".join(lines)
+
+    for pair in pairs:
+        tr = pair["tr"]
+        glb = pair["global"]
+        try_equivalent = glb["price_gbp"] * rate
+        lines.append(f"{tr['name']}")
+        lines.append(f"Türkiye: {tr['price_try']:,.2f} TL")
+        lines.append(f"{tr['url']}")
+        lines.append(
+            f"Yurtdışı: £{glb['price_gbp']:,.2f} (~{try_equivalent:,.2f} TL, güncel kur: {rate:.2f})"
+        )
+        lines.append(f"{glb['url']}")
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -64,6 +87,7 @@ def run() -> None:
         return
 
     last_id = None
+    triggered_for = []
     for update in updates:
         last_id = update["update_id"]
         message = update.get("message")
@@ -75,13 +99,24 @@ def run() -> None:
             print(f"Tanınmayan chat_id ({chat_id}) - yok sayıldı.")
             continue
 
-        print(f"Sorgu alındı: {message.get('text', '')!r}")
-        send_message(chat_id, "Aranıyor, birkaç saniye sürebilir...")
-        laptops = search()
-        send_message(chat_id, format_results(laptops))
+        print(f"Sorgu alındı ({chat_id}): {message.get('text', '')!r}")
+        send_message(chat_id, "İstek gönderildi, aranıyor...")
+        triggered_for.append(chat_id)
 
     if last_id is not None:
         save_offset(last_id)
+
+    if not triggered_for:
+        return
+
+    tr_laptops = search_tr()
+    global_laptops = search_global()
+    pairs = match(tr_laptops, global_laptops)
+    rate = gbp_to_try_rate()
+    result_text = format_results(pairs, rate)
+
+    for chat_id in triggered_for:
+        send_message(chat_id, result_text)
 
 
 if __name__ == "__main__":
