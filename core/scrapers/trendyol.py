@@ -2,24 +2,29 @@
 
 Not: Trendyol robots.txt, arama sonucu sayfalarını (/sr, ?q=) yasaklıyor.
 Bu yüzden arama yerine sabit kategori/landing sayfaları kullanılıyor.
+
+"2tb-harici" için kapasiteye özel bir landing sayfası bulunamadı - genel "taşınabilir
+SSD" kategorisi çekilip ürün adına göre 2TB filtreleniyor (Pazarama'daki gibi).
 """
+import re
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 from scrapers._browser import fetch_rendered_html
-from scrapers._price import MIN_PLAUSIBLE_PRICE, parse_try
+from scrapers._price import MIN_PLAUSIBLE_PRICE, is_nvme, is_ssd, parse_try
 
 SITE = "Trendyol"
 BASE_URL = "https://www.trendyol.com"
 URLS = {
     "1tb": "https://www.trendyol.com/1tb-ssd-y-s3288",
     "2tb": "https://www.trendyol.com/2-tb-ssd-y-s88912",
+    "2tb-harici": "https://www.trendyol.com/tasinabilir-ssd-x-c108110",
 }
+CAPACITY_2TB_PATTERN = re.compile(r"\b2\s*[.,]?\s*tb\b", re.IGNORECASE)
 
 
-def scrape(capacity: str) -> list[dict]:
-    url = URLS[capacity]
+def _fetch_cards(url: str) -> list[dict]:
     html = fetch_rendered_html(url, wait_selector='a.product-card[data-testid="product-card"]')
     soup = BeautifulSoup(html, "html.parser")
 
@@ -38,8 +43,20 @@ def scrape(capacity: str) -> list[dict]:
             "name": name_el.get("alt", "").strip(),
             "price": price,
             "url": urljoin(BASE_URL, href),
-            "capacity": capacity,
         })
+    return products
+
+
+def scrape(capacity: str) -> list[dict]:
+    products = _fetch_cards(URLS[capacity])
+
+    if capacity in ("1tb", "2tb"):
+        products = [p for p in products if is_nvme(p["name"])]
+    elif capacity == "2tb-harici":
+        products = [p for p in products if is_ssd(p["name"]) and CAPACITY_2TB_PATTERN.search(p["name"])]
+
+    for p in products:
+        p["capacity"] = capacity
     return products
 
 

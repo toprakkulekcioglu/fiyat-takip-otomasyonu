@@ -5,13 +5,14 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from scrapers._price import MIN_PLAUSIBLE_PRICE, parse_try
+from scrapers._price import MIN_PLAUSIBLE_PRICE, is_nvme, is_ssd, parse_try
 
 SITE = "itopya.com"
 BASE_URL = "https://www.itopya.com"
 URLS = {
     "1tb": "https://www.itopya.com/ssd_k20?kapasite=1tb-q3577",
     "2tb": "https://www.itopya.com/ssd_k20?kapasite=2tb-q3575",
+    "2tb-harici": "https://www.itopya.com/tasinabilir-disk_k89?kapasite=2tb-q3575",
 }
 HEADERS = {
     "User-Agent": (
@@ -33,12 +34,17 @@ def scrape(capacity: str) -> list[dict]:
         price_el = card.select_one("span.product-price strong")
         if not link_el or not price_el:
             continue
+        name = link_el.get_text(strip=True)
+        if capacity in ("1tb", "2tb") and not is_nvme(name):
+            continue
+        if capacity == "2tb-harici" and not is_ssd(name):
+            continue
         price = parse_try(price_el.get_text())
         if price is None or price < MIN_PLAUSIBLE_PRICE:
             continue
         products.append({
             "site": SITE,
-            "name": link_el.get_text(strip=True),
+            "name": name,
             "price": price,
             "url": urljoin(BASE_URL, link_el.get("href")),
             "capacity": capacity,

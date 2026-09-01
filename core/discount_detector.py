@@ -29,11 +29,25 @@ def check_discount(
     current_price: float,
     threshold: float = 0.25,
     min_data_points: int = 5,
+    price_ceiling: float | None = None,
 ) -> DiscountCheck:
     """history_prices: son 30-60 günlük geçmiş fiyatlar (current_price HARİÇ).
     threshold: 0.25 = medyanın en az %25 altına inmeli.
     min_data_points: yeterli geçmiş yoksa (yeni eklenen ürün gibi) tetiklenmez.
+    price_ceiling: verilirse, güncel fiyat bu değerin altına düştüğünde - geçmiş
+        yetersiz olsa bile - medyan şartı aranmadan direkt tetiklenir (hedef fiyat
+        alarmı). Medyan şartı hâlâ ayrıca çalışır, ikisinden biri yeterlidir.
     """
+    if price_ceiling is not None and current_price <= price_ceiling:
+        reference_median = statistics.median(history_prices) if history_prices else current_price
+        return DiscountCheck(
+            is_genuine_discount=True,
+            current_price=current_price,
+            reference_median=reference_median,
+            discount_pct=(reference_median - current_price) / reference_median if reference_median else 0.0,
+            reason=f"Hedef fiyata ulaşıldı: {current_price:.2f} TL (eşik: {price_ceiling:.2f} TL)",
+        )
+
     if len(history_prices) < min_data_points:
         return DiscountCheck(
             is_genuine_discount=False,
