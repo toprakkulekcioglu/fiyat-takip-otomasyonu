@@ -5,7 +5,7 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 from discount_detector import DiscountCheck
 from notifier import load_dotenv, notify_discount

@@ -13,7 +13,7 @@ from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path(__file__).parent / "data" / "price_history.db"
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "price_history.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS price_history (

@@ -14,7 +14,7 @@ import requests
 from discount_detector import DiscountCheck
 
 
-def load_dotenv(path: Path = Path(__file__).parent / ".env") -> None:
+def load_dotenv(path: Path = Path(__file__).resolve().parent.parent / ".env") -> None:
     """.env dosyasındaki KEY=VALUE satırlarını, zaten ortamda yoksa os.environ'a yükler."""
     if not path.exists():
         return

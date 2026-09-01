@@ -7,7 +7,7 @@ Detay için scrapers/hepsiburada.py içindeki not'a bak.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 from scrapers import amazon, incehesap, itopya, n11, pazarama, trendyol
 

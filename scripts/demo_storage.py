@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 from storage import get_latest_price, get_price_history, get_tracked_products, save_snapshot
 

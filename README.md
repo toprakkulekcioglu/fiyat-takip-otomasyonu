@@ -9,11 +9,11 @@ veren bir sistem.
 ## Nasıl çalışır
 
 ```
-check_and_notify.py  (GitHub Actions her 10 dakikada bir bunu çalıştırır)
-  ├─ scrapers/*.py        → her siteden güncel fiyatları çeker
-  ├─ storage.py           → fiyatları SQLite'a kaydeder, geçmişi okur
-  ├─ discount_detector.py → güncel fiyatı son 45 günün MEDYANIYLA karşılaştırır
-  └─ notifier.py          → gerçek bir indirimse e-posta/Telegram/WhatsApp gönderir
+core/check_and_notify.py  (GitHub Actions her 10 dakikada bir bunu çalıştırır)
+  ├─ core/scrapers/*.py        → her siteden güncel fiyatları çeker
+  ├─ core/storage.py           → fiyatları SQLite'a kaydeder, geçmişi okur
+  ├─ core/discount_detector.py → güncel fiyatı son 45 günün MEDYANIYLA karşılaştırır
+  └─ core/notifier.py          → gerçek bir indirimse e-posta/Telegram/WhatsApp gönderir
 ```
 
 Neden medyan, ortalama değil: bir satıcı "indirimden" hemen önce fiyatı yapay olarak
@@ -24,15 +24,13 @@ etkiler. Detaylı açıklama ve test senaryoları için [docs/ogrenilenler.md](d
 
 | Yol | İçerik |
 |---|---|
-| `check_and_notify.py` | Ana script - GitHub Actions'ın çalıştırdığı tek giriş noktası |
-| `storage.py` | Fiyat geçmişi deposu (SQLite) |
-| `discount_detector.py` | Sahte indirim tespiti (medyan karşılaştırma) |
-| `notifier.py` | E-posta (SMTP) + Telegram + WhatsApp (CallMeBot) bildirimleri |
-| `scrapers/` | Her site için ayrı scraper modülü |
+| `core/` | Otomasyonun tüm çalışan kodu (aşağıda detayı) |
 | `data/price_history.db` | Biriken fiyat geçmişi (GitHub Actions her çalıştırmada geri commit'ler) |
 | `scripts/` | Manuel test/demo scriptleri - otomasyonun parçası değil |
 | `docs/` | Geliştirme sürecinde çıkan sorunlar, çözümler ve terimler |
 | `.github/workflows/price-check.yml` | Zamanlama (cron) tanımı |
+
+Her dosyanın ne işe yaradığının tam dökümü için [docs/dosya-yapisi.md](docs/dosya-yapisi.md).
 
 ## Kurulum (yerelde çalıştırmak istersen)
 
@@ -42,13 +40,13 @@ venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 playwright install chromium
 cp .env.example .env           # doldur: SMTP, Telegram, CallMeBot bilgileri
-python check_and_notify.py
+python core/check_and_notify.py
 ```
 
 ## Otomasyon
 
 `.github/workflows/price-check.yml`, GitHub'ın kendi sunucularında her 10 dakikada
-bir `check_and_notify.py`'yi çalıştırır - yerel bilgisayarın açık olmasına gerek
+bir `core/check_and_notify.py`'yi çalıştırır - yerel bilgisayarın açık olmasına gerek
 yoktur. Gerekli SMTP/Telegram/CallMeBot bilgileri repo Settings → Secrets and
 variables → Actions altında tanımlıdır, koda gömülü değildir.
 
@@ -56,5 +54,5 @@ variables → Actions altında tanımlıdır, koda gömülü değildir.
 
 Hepsiburada, otomatik/tekrarlanan isteklerde Akamai bot korumasının CAPTCHA
 sayfasına yönlendiriyor. CAPTCHA çözme veya parmak izi sahteciliği gibi bir bypass
-yapılmadığı için bu site listeye dahil edilmedi (`scrapers/hepsiburada.py` referans
+yapılmadığı için bu site listeye dahil edilmedi (`core/scrapers/hepsiburada.py` referans
 olarak duruyor ama kullanılmıyor). Detay: [docs/sorunlar-ve-cozumler.md](docs/sorunlar-ve-cozumler.md).
