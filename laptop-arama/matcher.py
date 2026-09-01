@@ -1,23 +1,23 @@
-"""Türkiye ve yurtdışı (İngiltere/PriceRunner) laptop listelerini aynı fiziksel
-modele göre eşleştirir.
+"""Türkiye ve yurtdışı (İngiltere/PriceRunner) laptop listelerini aynı ürün
+serisine göre eşleştirir.
 
-Yöntem: üreticiler aynı laptop modelini farklı ülkelerde genelde aynı temel model
-kodu ile satar (örn. "A2XWHG-082TR" / "A2XWHG-403UK" - sadece ülke soneki farklı).
-Ama bu kod tek başına GÜVENİLİR DEĞİL - testte "MSI Stealth 18" ile "MSI Vector 16"
-(iki farklı ürün serisi, farklı ekran boyutu) sırf kod parçası çakıştığı için
-yanlışlıkla eşleşti. Bu yüzden EK olarak ürün serisi adının da (Stealth/Vector/
-Raider gibi) her iki isimde aynı olması şart koşuluyor - marka + model kodu +
-seri adı üçü birden tutmayınca eşleşme kabul edilmiyor.
+Yöntem: marka (ilk kelime, örn. "MSI") ve bilinen ürün serisi adı (Stealth,
+Vector, Legion, ROG Strix gibi) her iki isimde de aynıysa eşleşme kabul edilir.
+Ayrıca bir model kodu (5+ karakterli, harf+rakam karışık token, örn. "A2XWHG")
+her iki isimde de bulunup örtüşüyorsa bu "kesin" (high) güven seviyesi olarak
+işaretlenir - bulunamazsa "yaklaşık" (approx) olarak işaretlenir.
 
-Bu yine de tahmin bazlı bir eşleştirme - garanti değil, sonuçlar gösterilirken
-bunun otomatik/yaklaşık bir eşleştirme olduğu belirtilmeli.
+Neden sadece marka+seri yeterli görülüyor: testte aynı seri (MSI Vector) için
+TR ilanında işlemci kodu ("255HX"), UK ilanında şasi kodu ("A2XWHG") gibi FARKLI
+TÜRDE kodlar geçtiği için kod eşleştirmesi tek başına gerçek eşleşmeleri
+kaçırıyordu. Ama marka+seri TEK BAŞINA da riskli - aynı seri farklı ekran boyutu/
+yapılandırmada olabilir. Bu yüzden sonuçlar "yaklaşık" etiketiyle gösterilmeli,
+kesin sanılmamalı.
 """
 import re
 
 _CODE_PATTERN = re.compile(r"\b(?=[A-Z0-9]{5,}\b)(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*[0-9])[A-Z0-9]{5,}\b")
 
-# Bilinen oyun/iş istasyonu laptop serisi isimleri - marka+kod eşleşse bile seri
-# adı da eşleşmezse muhtemelen farklı bir üründür.
 _KNOWN_SERIES = (
     "stealth", "vector", "raider", "titan", "katana", "sword", "cyborg",  # MSI
     "strix", "zephyrus", "tuf", "scar", "flow",  # ASUS
@@ -27,6 +27,10 @@ _KNOWN_SERIES = (
     "blade",  # Razer
     "alienware",  # Dell
 )
+
+# Model kodu sanılmaması gereken, ürün adında sık geçen teknik token'lar
+# (CPU/GPU model numaraları, RAM/SSD boyutları, panel çözünürlüğü vb.)
+_CODE_IGNORE_SUBSTRINGS = ("5070", "5080", "5090", "RTX", "HX", "GB", "TB", "HZ", "FHD", "WUXGA", "WQXGA")
 
 
 def _brand(name: str) -> str:
@@ -44,44 +48,45 @@ def _series(name: str) -> str | None:
 def _model_codes(name: str) -> set[str]:
     upper = name.upper()
     codes = set()
-    for match in _CODE_PATTERN.finditer(upper):
-        code = match.group(0)
-        # "RTX5070TI" gibi GPU adını model kodu sanmamak için filtrele.
-        if "5070" in code or "RTX" in code:
+    for m in _CODE_PATTERN.finditer(upper):
+        code = m.group(0)
+        if any(ignore in code for ignore in _CODE_IGNORE_SUBSTRINGS):
             continue
         codes.add(code)
     return codes
 
 
+def _codes_overlap(a_codes: set[str], b_codes: set[str]) -> bool:
+    return any(
+        a == b or a.startswith(b) or b.startswith(a)
+        for a in a_codes for b in b_codes
+        if len(a) >= 5 and len(b) >= 5
+    )
+
+
 def match(tr_laptops: list[dict], global_laptops: list[dict]) -> list[dict]:
-    """Her eşleşen çift için {'tr': ..., 'global': ...} döner."""
+    """Her eşleşen çift için {'tr': ..., 'global': ..., 'confidence': 'high'|'approx'} döner."""
     pairs = []
     used_global = set()
 
     for tr in tr_laptops:
         tr_brand = _brand(tr["name"])
         tr_series = _series(tr["name"])
-        tr_codes = _model_codes(tr["name"])
-        if not tr_codes or not tr_series:
+        if not tr_series:
             continue
+        tr_codes = _model_codes(tr["name"])
 
         for idx, glb in enumerate(global_laptops):
             if idx in used_global:
                 continue
             if _brand(glb["name"]) != tr_brand or _series(glb["name"]) != tr_series:
                 continue
-            glb_codes = _model_codes(glb["name"])
-            if not glb_codes:
-                continue
 
-            # Kodlardan biri diğerinin öneki ise (bölge soneki farkı) eşleşme kabul edilir.
-            if any(
-                a == b or a.startswith(b) or b.startswith(a)
-                for a in tr_codes for b in glb_codes
-                if len(a) >= 5 and len(b) >= 5
-            ):
-                pairs.append({"tr": tr, "global": glb})
-                used_global.add(idx)
-                break
+            glb_codes = _model_codes(glb["name"])
+            confidence = "high" if _codes_overlap(tr_codes, glb_codes) else "approx"
+
+            pairs.append({"tr": tr, "global": glb, "confidence": confidence})
+            used_global.add(idx)
+            break
 
     return pairs

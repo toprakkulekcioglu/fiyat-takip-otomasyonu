@@ -58,9 +58,9 @@ def format_results(pairs: list[dict], rate: float) -> str:
 
     if not pairs:
         lines.append(
-            "Şu an Türkiye ve yurtdışı kataloglarında güvenle eşleştirilebilen "
-            "(aynı model, sadece farklı ülke) bir RTX 5070 Ti laptop bulunamadı - "
-            "GPU çok yeni, kataloglar henüz örtüşmüyor olabilir."
+            "Şu an Türkiye ve yurtdışı kataloglarında eşleştirilebilen 12GB+ "
+            "RTX 50 serisi (5070 Ti/5080/5090) laptop bulunamadı - bu GPU'lar "
+            "çok yeni, kataloglar henüz örtüşmüyor olabilir."
         )
         return "\n".join(lines)
 
@@ -68,7 +68,12 @@ def format_results(pairs: list[dict], rate: float) -> str:
         tr = pair["tr"]
         glb = pair["global"]
         try_equivalent = glb["price_gbp"] * rate
-        lines.append(f"{tr['name']}")
+        etiket = (
+            "(kesin eşleşme - aynı model kodu)"
+            if pair["confidence"] == "high"
+            else "(yaklaşık eşleşme - aynı seri, yapılandırma farklı olabilir, almadan önce kontrol et)"
+        )
+        lines.append(f"{tr['name']}  {etiket}")
         lines.append(f"Türkiye: {tr['price_try']:,.2f} TL")
         lines.append(f"{tr['url']}")
         lines.append(

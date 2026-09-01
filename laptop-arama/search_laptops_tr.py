@@ -1,6 +1,6 @@
-"""Türkiye'de satılan RTX 5070 Ti laptopları Amazon.com.tr üzerinden anlık çeker.
-Diğer laptop-arama script'leri gibi otomasyonun (core/) parçası değil, sadece
-elle/bot tetiklemesiyle çalışır.
+"""Türkiye'de satılan, 12GB+ VRAM'li RTX 50 serisi laptopları (5070 Ti, 5080,
+5090) Amazon.com.tr üzerinden anlık çeker. Diğer laptop-arama script'leri gibi
+otomasyonun (core/) parçası değil, sadece elle/bot tetiklemesiyle çalışır.
 """
 import re
 import sys
@@ -13,8 +13,9 @@ from bs4 import BeautifulSoup
 from scrapers._browser import fetch_rendered_html
 from scrapers._price import parse_try
 
-SEARCH_URL = "https://www.amazon.com.tr/s?k=rtx+5070+ti+laptop"
-_5070TI_PATTERN = re.compile(r"5070\s?ti", re.IGNORECASE)
+SEARCH_URL = "https://www.amazon.com.tr/s?k=rtx+5070+ti+5080+5090+laptop"
+# Taban 5070 (8GB) hariç: "5070 ti" ya da düz "5080"/"5090" (bunlar zaten 12GB+).
+_GPU_PATTERN = re.compile(r"5070\s?ti|5080|5090", re.IGNORECASE)
 
 
 def search() -> list[dict]:
@@ -29,7 +30,7 @@ def search() -> list[dict]:
         if not asin or not name_el or not price_el:
             continue
         name = name_el.get_text(strip=True)
-        if not _5070TI_PATTERN.search(name):
+        if not _GPU_PATTERN.search(name):
             continue
         price = parse_try(price_el.get_text())
         if price is None:

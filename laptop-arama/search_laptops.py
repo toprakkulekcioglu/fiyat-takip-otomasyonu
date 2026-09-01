@@ -1,6 +1,7 @@
 """Avrupa'daki (PriceRunner UK üzerinden - çok mağazalı fiyat karşılaştırması)
-RTX 5070 Ti laptop fiyatlarını ANLIK olarak çeker. Otomasyonun (core/) parçası
-DEĞİL - zamanlanmış çalışmıyor, sadece elle çalıştırıldığında güncel veri getirir.
+12GB+ VRAM'li RTX 50 serisi laptop fiyatlarını (5070 Ti, 5080, 5090) ANLIK olarak
+çeker. Otomasyonun (core/) parçası DEĞİL - zamanlanmış çalışmıyor, sadece elle/bot
+tetiklemesiyle güncel veri getirir.
 
 Not: PriceRunner sadece fiyat + mağaza sayısı veriyor; "incelik" ve "DCI-P3/Adobe
 RGB %90+ ekran" gibi spec'ler burada listelenmiyor (fiyat karşılaştırma sitelerinde
@@ -18,7 +19,13 @@ from bs4 import BeautifulSoup
 
 from scrapers._browser import fetch_rendered_html
 
-CATEGORY_URL = "https://www.pricerunner.com/sp/laptop-5070-ti.html"
+# 12GB+ VRAM'li RTX 50 serisi mobil GPU'lar: 5070 Ti (12GB), 5080 (16GB), 5090 (24GB).
+# Taban 5070 (8GB) ve altı dahil değil.
+CATEGORY_URLS = [
+    "https://www.pricerunner.com/sp/laptop-5070-ti.html",
+    "https://www.pricerunner.com/sp/rtx-5080-laptop.html",
+    "https://www.pricerunner.com/sp/5090-laptop.html",
+]
 
 PRICE_PATTERN = re.compile(r"£([\d,]+\.\d{2}|[\d,]+)")
 STORES_PATTERN = re.compile(r"(\d+\+?)\s*stores?")
@@ -37,16 +44,15 @@ def _find_card(anchor):
     return None
 
 
-def search() -> list[dict]:
-    html = fetch_rendered_html(CATEGORY_URL, wait_selector='a[href*="/pl/"]', timeout_ms=25000)
+def _search_category(url: str) -> list[dict]:
+    html = fetch_rendered_html(url, wait_selector='a[href*="/pl/"]', timeout_ms=25000)
     soup = BeautifulSoup(html, "html.parser")
 
     results = []
-    seen_urls = set()
     for anchor in soup.select('a[href*="/pl/"]'):
         href = anchor.get("href")
         name = anchor.get("title") or anchor.get("aria-label")
-        if not href or not name or href in seen_urls:
+        if not href or not name:
             continue
 
         card = _find_card(anchor)
@@ -62,13 +68,24 @@ def search() -> list[dict]:
         stores_match = STORES_PATTERN.search(card_text)
         stores = stores_match.group(0) if stores_match else "?"
 
-        seen_urls.add(href)
         results.append({
             "name": name,
             "price_gbp": price,
             "stores": stores,
             "url": "https://www.pricerunner.com" + href,
         })
+    return results
+
+
+def search() -> list[dict]:
+    seen_urls = set()
+    results = []
+    for category_url in CATEGORY_URLS:
+        for laptop in _search_category(category_url):
+            if laptop["url"] in seen_urls:
+                continue
+            seen_urls.add(laptop["url"])
+            results.append(laptop)
 
     results.sort(key=lambda r: r["price_gbp"])
     return results
@@ -76,7 +93,7 @@ def search() -> list[dict]:
 
 if __name__ == "__main__":
     laptops = search()
-    print(f"{len(laptops)} sonuç bulundu (PriceRunner UK, RTX 5070 Ti laptoplar, fiyata göre sıralı)\n")
+    print(f"{len(laptops)} sonuç bulundu (PriceRunner UK, 12GB+ RTX 50 serisi laptoplar, fiyata göre sıralı)\n")
     for laptop in laptops:
         print(f"£{laptop['price_gbp']:>9,.2f}  ({laptop['stores']:>10})  {laptop['name']}")
         print(f"           {laptop['url']}")
