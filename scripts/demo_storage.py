@@ -5,12 +5,15 @@ sonra get_price_history/get_latest_price gibi sorguların sonucunu yazdırır. A
 demo veritabanı dosyası kullanır - gerçek price_history.db'ye karışmaz.
 """
 import random
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from storage import get_latest_price, get_price_history, get_tracked_products, save_snapshot
 
-DEMO_DB = Path(__file__).parent / "data" / "demo_price_history.db"
+DEMO_DB = Path(__file__).resolve().parent.parent / "data" / "demo_price_history.db"
 DEMO_DB.unlink(missing_ok=True)
 
 SITE = "DemoSite"

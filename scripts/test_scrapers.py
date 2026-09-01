@@ -4,6 +4,11 @@ Not: hepsiburada.py bilerek burada değil - Akamai bot koruması otomatik istekl
 CAPTCHA sayfasına yönlendiriyor, bypass yapmadığımız için MVP'den çıkarıldı.
 Detay için scrapers/hepsiburada.py içindeki not'a bak.
 """
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from scrapers import amazon, incehesap, itopya, n11, pazarama, trendyol
 
 SCRAPERS = [amazon, trendyol, incehesap, itopya, n11, pazarama]

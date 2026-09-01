@@ -2,6 +2,11 @@
 
 Çalıştırmadan önce .env dosyasını doldurmuş olman lazım (bkz. .env.example).
 """
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from discount_detector import DiscountCheck
 from notifier import load_dotenv, notify_discount
 
