@@ -1,7 +1,7 @@
 # Fiyat Takip Otomasyonu
 
 Türkiye'deki 6 e-ticaret sitesinden (Amazon.com.tr, Trendyol, incehesap, itopya,
-n11, Pazarama) 1TB/2TB SSD fiyatlarını GitHub Actions ile her 10 dakikada bir
+n11, Pazarama) istenen ürün fiyatlarını GitHub Actions ile her 10 dakikada bir
 otomatik tarayan, bir ürün **gerçekten** ucuzladığında (önce yapay zam yapıp sonra
 "indirim" gösterme numarasını eleyerek) e-posta, Telegram ve WhatsApp ile haber
 veren bir sistem.
