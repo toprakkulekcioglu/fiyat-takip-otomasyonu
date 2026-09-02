@@ -7,6 +7,7 @@ Sıra önemli: önce geçmiş okunup karşılaştırma yapılıyor, SONRA bugün
 kaydediliyor - yoksa medyan kendi güncel fiyatını da içine katardı.
 """
 from discount_detector import check_discount
+from excluded_products import EXCLUDED_URLS
 from notifier import load_dotenv, notify_discount
 from scrapers import amazon, incehesap, itopya, n11, pazarama, trendyol
 from scrapers._price import is_accessory, is_external, matches_capacity
@@ -39,6 +40,8 @@ def run() -> None:
             continue
 
         def is_valid(p: dict) -> bool:
+            if p["url"] in EXCLUDED_URLS:
+                return False
             if not matches_capacity(p["name"], p["capacity"]) or is_accessory(p["name"]):
                 return False
             if p["capacity"] in ("1tb", "2tb") and is_external(p["name"]):

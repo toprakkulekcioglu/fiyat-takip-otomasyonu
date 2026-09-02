@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
+from excluded_products import EXCLUDED_URLS
 from scrapers import amazon, incehesap, itopya, n11, pazarama, trendyol
 from scrapers._price import is_accessory, is_external, matches_capacity
 
@@ -24,7 +25,8 @@ if __name__ == "__main__":
             continue
         products = [
             p for p in products
-            if matches_capacity(p["name"], p["capacity"])
+            if p["url"] not in EXCLUDED_URLS
+            and matches_capacity(p["name"], p["capacity"])
             and not is_accessory(p["name"])
             and not (p["capacity"] in ("1tb", "2tb") and is_external(p["name"]))
         ]
