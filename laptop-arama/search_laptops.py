@@ -81,7 +81,13 @@ def search() -> list[dict]:
     seen_urls = set()
     results = []
     for category_url in CATEGORY_URLS:
-        for laptop in _search_category(category_url):
+        try:
+            found = _search_category(category_url)
+        except Exception as e:
+            print(f"  {category_url}: HATA - {e}", flush=True)
+            continue
+        print(f"  {category_url}: {len(found)} urun", flush=True)
+        for laptop in found:
             if laptop["url"] in seen_urls:
                 continue
             seen_urls.add(laptop["url"])

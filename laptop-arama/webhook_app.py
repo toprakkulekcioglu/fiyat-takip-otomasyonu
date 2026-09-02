@@ -78,8 +78,11 @@ def handle_query(chat_id: str) -> None:
     """Arka planda çalışır - Telegram'ı (ve kullanıcıyı) bekletmemek için ayrı thread'de."""
     try:
         tr_laptops = search_tr()
+        print(f"TR taramasi: {len(tr_laptops)} urun bulundu", flush=True)
         global_laptops = search_global()
+        print(f"Global tarama: {len(global_laptops)} urun bulundu", flush=True)
         pairs = match(tr_laptops, global_laptops)
+        print(f"Eslesme: {len(pairs)}", flush=True)
         rate = gbp_to_try_rate()
         send_message(chat_id, format_results(pairs, rate))
     except Exception as e:

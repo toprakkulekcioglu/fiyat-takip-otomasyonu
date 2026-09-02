@@ -87,9 +87,11 @@ def search() -> list[dict]:
     results = []
     for fetch in (_from_amazon, _from_n11):
         try:
-            results.extend(fetch())
+            found = fetch()
+            print(f"  {fetch.__name__}: {len(found)} urun", flush=True)
+            results.extend(found)
         except Exception as e:
-            print(f"{fetch.__name__}: HATA - {e}")
+            print(f"  {fetch.__name__}: HATA - {e}", flush=True)
 
     results.sort(key=lambda r: r["price_try"])
     return results
