@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 from urllib.parse import urljoin
 
-import requests
 from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
@@ -23,12 +22,6 @@ from scrapers._price import parse_try
 AMAZON_URL = "https://www.amazon.com.tr/s?k=rtx+5070+ti+5080+5090+laptop"
 N11_URL = "https://www.n11.com/bilgisayar/dizustu-bilgisayar?q=rtx+5070+ti+5080+5090"
 N11_BASE = "https://www.n11.com"
-N11_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-    )
-}
 
 # Taban 5070 (8GB) hariç: "5070 ti" ya da düz "5080"/"5090" (bunlar zaten 12GB+).
 _GPU_PATTERN = re.compile(r"5070\s?ti|5080|5090", re.IGNORECASE)
@@ -42,7 +35,9 @@ def _is_laptop(name: str) -> bool:
 
 
 def _from_amazon() -> list[dict]:
-    html = fetch_rendered_html(AMAZON_URL, wait_selector='div[data-component-type="s-search-result"]')
+    html = fetch_rendered_html(
+        AMAZON_URL, wait_selector='div[data-component-type="s-search-result"]', timeout_ms=45000
+    )
     soup = BeautifulSoup(html, "html.parser")
 
     results = []
@@ -63,9 +58,12 @@ def _from_amazon() -> list[dict]:
 
 
 def _from_n11() -> list[dict]:
-    response = requests.get(N11_URL, headers=N11_HEADERS, timeout=15)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
+    # Not: düz `requests` isteği Render'ın (Frankfurt) IP'sinden 403 ile
+    # engelleniyor - yerelde/GitHub Actions'ta sorun yoktu. Gerçek bir tarayıcı
+    # motoruyla (Playwright) aynı sorun çıkmıyor, o yüzden diğer scraper'lardaki
+    # gibi bu yönteme geçildi.
+    html = fetch_rendered_html(N11_URL, wait_selector="a.product-item[href]", timeout_ms=45000)
+    soup = BeautifulSoup(html, "html.parser")
 
     results = []
     for card in soup.select("a.product-item[href]"):

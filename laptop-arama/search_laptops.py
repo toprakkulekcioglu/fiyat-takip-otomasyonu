@@ -45,7 +45,7 @@ def _find_card(anchor):
 
 
 def _search_category(url: str) -> list[dict]:
-    html = fetch_rendered_html(url, wait_selector='a[href*="/pl/"]', timeout_ms=25000)
+    html = fetch_rendered_html(url, wait_selector='a[href*="/pl/"]', timeout_ms=45000)
     soup = BeautifulSoup(html, "html.parser")
 
     results = []
