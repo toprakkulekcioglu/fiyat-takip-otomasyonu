@@ -38,8 +38,38 @@ API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
 app = Flask(__name__)
 
 
+TELEGRAM_MAX_LEN = 4096  # Telegram'ın tek mesaj için karakter sınırı
+
+
 def send_message(chat_id: str, text: str) -> None:
-    requests.post(f"{API_BASE}/sendMessage", data={"chat_id": chat_id, "text": text}, timeout=20)
+    """Telegram API'sinin CEVABINI kontrol ediyor - HTTP isteği başarılı görünse
+    bile Telegram mesajı reddetmiş olabilir (örn. 4096 karakter sınırı aşılınca),
+    bu kontrol olmadan hata sessizce yutuluyordu."""
+    response = requests.post(f"{API_BASE}/sendMessage", data={"chat_id": chat_id, "text": text}, timeout=20)
+    data = response.json()
+    if not data.get("ok"):
+        raise RuntimeError(f"Telegram mesaji reddetti: {data}")
+
+
+def send_long_message(chat_id: str, text: str) -> None:
+    """4096 karakteri aşan mesajları, ürün bloklarını (boş satırla ayrılmış)
+    bölmeden birden fazla mesaja parçalayıp gönderir."""
+    if len(text) <= TELEGRAM_MAX_LEN:
+        send_message(chat_id, text)
+        return
+
+    blocks = text.split("\n\n")
+    chunk = ""
+    for block in blocks:
+        candidate = f"{chunk}\n\n{block}" if chunk else block
+        if len(candidate) > TELEGRAM_MAX_LEN:
+            if chunk:
+                send_message(chat_id, chunk)
+            chunk = block
+        else:
+            chunk = candidate
+    if chunk:
+        send_message(chat_id, chunk)
 
 
 def format_results(pairs: list[dict], rate: float) -> str:
@@ -90,7 +120,7 @@ def handle_query(chat_id: str) -> None:
 
         text = format_results(pairs, rate)
         print(f"Mesaj hazir ({len(text)} karakter), gonderiliyor...", flush=True)
-        send_message(chat_id, text)
+        send_long_message(chat_id, text)
         print("Mesaj gonderildi.", flush=True)
     except Exception as e:
         print(f"HANDLE_QUERY HATASI: {type(e).__name__}: {e}", flush=True)
@@ -113,7 +143,10 @@ def telegram_webhook():
         return "ok", 200
 
     print(f"Sorgu alındı ({chat_id}): {message.get('text', '')!r}")
-    send_message(chat_id, "İstek gönderildi, aranıyor...")
+    try:
+        send_message(chat_id, "İstek gönderildi, aranıyor...")
+    except Exception as e:
+        print(f"ACK MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
     threading.Thread(target=handle_query, args=(chat_id,), daemon=True).start()
     return "ok", 200
 
