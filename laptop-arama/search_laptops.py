@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 from bs4 import BeautifulSoup
 
-from scrapers._browser import fetch_rendered_html
+from scrapers._browser import fetch_multiple_rendered_html
 
 # 12GB+ VRAM'li RTX 50 serisi mobil GPU'lar: 5070 Ti (12GB), 5080 (16GB), 5090 (24GB).
 # Taban 5070 (8GB) ve altı dahil değil.
@@ -44,8 +44,7 @@ def _find_card(anchor):
     return None
 
 
-def _search_category(url: str) -> list[dict]:
-    html = fetch_rendered_html(url, wait_selector='a[href*="/pl/"]', timeout_ms=45000)
+def _parse_category(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
 
     results = []
@@ -78,14 +77,19 @@ def _search_category(url: str) -> list[dict]:
 
 
 def search() -> list[dict]:
+    # 3 kategori için ayrı ayrı tarayıcı açıp kapatmak yerine tek bir Chromium
+    # örneğiyle sırayla çekiyoruz - düşük bellekli sunucularda (Render) daha
+    # güvenilir çalışıyor.
+    requests_list = [(url, 'a[href*="/pl/"]') for url in CATEGORY_URLS]
+    htmls = fetch_multiple_rendered_html(requests_list, timeout_ms=45000)
+
     seen_urls = set()
     results = []
-    for category_url in CATEGORY_URLS:
-        try:
-            found = _search_category(category_url)
-        except Exception as e:
-            print(f"  {category_url}: HATA - {e}", flush=True)
+    for category_url, html in zip(CATEGORY_URLS, htmls):
+        if isinstance(html, Exception):
+            print(f"  {category_url}: HATA - {html}", flush=True)
             continue
+        found = _parse_category(html)
         print(f"  {category_url}: {len(found)} urun", flush=True)
         for laptop in found:
             if laptop["url"] in seen_urls:

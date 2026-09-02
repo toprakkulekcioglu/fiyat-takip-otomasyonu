@@ -5,7 +5,8 @@ tetiklemesiyle çalışır.
 
 İki kaynak kullanılıyor çünkü tek bir sitenin arama sonuçları istekten isteğe
 değişkenlik gösterebiliyor (reklam/sıralama rotasyonu) - bu da yurtdışı
-kataloğuyla örtüşme ihtimalini gereksiz yere düşürüyor.
+kataloğuyla örtüşme ihtimalini gereksiz yere düşürüyor. İkisi de TEK bir
+Chromium örneğiyle çekiliyor (düşük bellekli sunucularda daha güvenilir).
 """
 import re
 import sys
@@ -16,7 +17,7 @@ from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
-from scrapers._browser import fetch_rendered_html
+from scrapers._browser import fetch_multiple_rendered_html
 from scrapers._price import parse_try
 
 AMAZON_URL = "https://www.amazon.com.tr/s?k=rtx+5070+ti+5080+5090+laptop"
@@ -34,12 +35,8 @@ def _is_laptop(name: str) -> bool:
     return bool(_LAPTOP_INDICATOR.search(name)) and not _DESKTOP_CARD_INDICATOR.search(name)
 
 
-def _from_amazon() -> list[dict]:
-    html = fetch_rendered_html(
-        AMAZON_URL, wait_selector='div[data-component-type="s-search-result"]', timeout_ms=45000
-    )
+def _parse_amazon(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
-
     results = []
     for card in soup.select('div[data-component-type="s-search-result"]'):
         asin = card.get("data-asin")
@@ -57,14 +54,8 @@ def _from_amazon() -> list[dict]:
     return results
 
 
-def _from_n11() -> list[dict]:
-    # Not: düz `requests` isteği Render'ın (Frankfurt) IP'sinden 403 ile
-    # engelleniyor - yerelde/GitHub Actions'ta sorun yoktu. Gerçek bir tarayıcı
-    # motoruyla (Playwright) aynı sorun çıkmıyor, o yüzden diğer scraper'lardaki
-    # gibi bu yönteme geçildi.
-    html = fetch_rendered_html(N11_URL, wait_selector="a.product-item[href]", timeout_ms=45000)
+def _parse_n11(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
-
     results = []
     for card in soup.select("a.product-item[href]"):
         name_el = card.select_one("h2.product-item-title")
@@ -82,14 +73,22 @@ def _from_n11() -> list[dict]:
 
 
 def search() -> list[dict]:
+    requests_list = [
+        (AMAZON_URL, 'div[data-component-type="s-search-result"]'),
+        (N11_URL, "a.product-item[href]"),
+    ]
+    htmls = fetch_multiple_rendered_html(requests_list, timeout_ms=45000)
+
     results = []
-    for fetch in (_from_amazon, _from_n11):
-        try:
-            found = fetch()
-            print(f"  {fetch.__name__}: {len(found)} urun", flush=True)
-            results.extend(found)
-        except Exception as e:
-            print(f"  {fetch.__name__}: HATA - {e}", flush=True)
+    for (url, _), html, parser, name in zip(
+        requests_list, htmls, (_parse_amazon, _parse_n11), ("amazon", "n11")
+    ):
+        if isinstance(html, Exception):
+            print(f"  {name}: HATA - {html}", flush=True)
+            continue
+        found = parser(html)
+        print(f"  {name}: {len(found)} urun", flush=True)
+        results.extend(found)
 
     results.sort(key=lambda r: r["price_try"])
     return results
