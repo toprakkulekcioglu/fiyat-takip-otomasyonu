@@ -83,10 +83,21 @@ def handle_query(chat_id: str) -> None:
         print(f"Global tarama: {len(global_laptops)} urun bulundu", flush=True)
         pairs = match(tr_laptops, global_laptops)
         print(f"Eslesme: {len(pairs)}", flush=True)
+
+        print("Kur cekiliyor...", flush=True)
         rate = gbp_to_try_rate()
-        send_message(chat_id, format_results(pairs, rate))
+        print(f"Kur alindi: {rate}", flush=True)
+
+        text = format_results(pairs, rate)
+        print(f"Mesaj hazir ({len(text)} karakter), gonderiliyor...", flush=True)
+        send_message(chat_id, text)
+        print("Mesaj gonderildi.", flush=True)
     except Exception as e:
-        send_message(chat_id, f"Bir hata oldu, tekrar dener misin? ({e})")
+        print(f"HANDLE_QUERY HATASI: {type(e).__name__}: {e}", flush=True)
+        try:
+            send_message(chat_id, f"Bir hata oldu, tekrar dener misin? ({e})")
+        except Exception as e2:
+            print(f"HATA MESAJI DA GONDERILEMEDI: {type(e2).__name__}: {e2}", flush=True)
 
 
 @app.route("/telegram-webhook", methods=["POST"])
