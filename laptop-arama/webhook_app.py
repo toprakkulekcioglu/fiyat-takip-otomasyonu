@@ -20,10 +20,11 @@ kelimeye bağlanıp aktif edilebilir.
 import os
 import sys
 import threading
+import uuid
 from pathlib import Path
 
 import requests
-from flask import Flask, request
+from flask import Flask, jsonify, request
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
@@ -181,6 +182,66 @@ def telegram_webhook():
         print(f"ACK MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
     threading.Thread(target=handle_greece_query, args=(chat_id, search_fn, baslik), daemon=True).start()
     return "ok", 200
+
+
+_jobs: dict[str, dict] = {}  # job_id -> {"status": "running"|"done"|"error", "data": ...}
+
+
+def _run_web_search(job_id: str, search_fn, baslik: str) -> None:
+    with _search_lock:
+        try:
+            laptops = search_fn()
+            print(f"[web] Selanik taramasi: {len(laptops)} urun bulundu", flush=True)
+            rate = eur_to_try_rate()
+            _jobs[job_id] = {
+                "status": "done",
+                "data": {
+                    "baslik": baslik,
+                    "rate": rate,
+                    "total": len(laptops),
+                    "laptops": [
+                        {**laptop, "price_try": round(laptop["price_eur"] * rate, 2)}
+                        for laptop in laptops[:MAX_RESULTS]
+                    ],
+                },
+            }
+        except Exception as e:
+            print(f"[web] ARAMA HATASI: {type(e).__name__}: {e}", flush=True)
+            _jobs[job_id] = {"status": "error", "data": str(e)}
+
+
+def _cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
+
+
+@app.route("/api/search", methods=["POST", "OPTIONS"])
+def api_search():
+    if request.method == "OPTIONS":
+        return _cors(app.make_default_options_response())
+
+    body = request.get_json(silent=True) or {}
+    kind = body.get("type")
+    if kind == "cpu":
+        search_fn, baslik = greece_search_by_cpu, "Ryzen AI 9 365+ işlemcili laptoplar (Selanik)"
+    elif kind == "gpu":
+        search_fn, baslik = greece_search_by_gpu, "RTX 5070 Ti/5080/5090 laptoplar (Selanik)"
+    else:
+        return _cors(jsonify({"error": "type 'cpu' veya 'gpu' olmalı"})), 400
+
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {"status": "running", "data": None}
+    threading.Thread(target=_run_web_search, args=(job_id, search_fn, baslik), daemon=True).start()
+    return _cors(jsonify({"job_id": job_id}))
+
+
+@app.route("/api/result/<job_id>", methods=["GET"])
+def api_result(job_id: str):
+    job = _jobs.get(job_id)
+    if not job:
+        return _cors(jsonify({"status": "not_found"})), 404
+    return _cors(jsonify(job))
 
 
 @app.route("/", methods=["GET"])
