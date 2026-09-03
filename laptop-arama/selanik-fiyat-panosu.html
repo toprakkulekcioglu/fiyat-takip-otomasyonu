@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Selanik Fiyat Panosu</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --paper:#F2EFE7;
+    --surface:#FBFAF6;
+    --ink:#1B2321;
+    --muted:#6B6558;
+    --line:#DDD6C6;
+    --teal:#0E6B5C;
+    --teal-ink:#F2FBF9;
+    --amber:#C9701B;
+    --amber-ink:#FBF3E9;
+    --shadow: 0 1px 0 rgba(27,35,33,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#131C19;
+      --surface:#182420;
+      --ink:#EDEAE1;
+      --muted:#9CA69F;
+      --line:#2B3A34;
+      --teal:#3FB39E;
+      --teal-ink:#0B1A17;
+      --amber:#F0A857;
+      --amber-ink:#241605;
+      --shadow: 0 1px 0 rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#131C19;
+    --surface:#182420;
+    --ink:#EDEAE1;
+    --muted:#9CA69F;
+    --line:#2B3A34;
+    --teal:#3FB39E;
+    --teal-ink:#0B1A17;
+    --amber:#F0A857;
+    --amber-ink:#241605;
+    --shadow: 0 1px 0 rgba(0,0,0,0.3);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{ margin:0; }
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Archivo', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    max-width:520px;
+    margin:0 auto;
+    padding:20px 16px 48px;
+  }
+  h1,h2{ text-wrap:balance; font-family:'Fraunces', Georgia, serif; margin:0; }
+  .eyebrow{
+    font-size:11.5px; letter-spacing:.11em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; margin-bottom:6px;
+  }
+  header{ margin-bottom:20px; }
+  h1{ font-size:26px; font-weight:600; color:var(--ink); }
+  .sub{ color:var(--muted); font-size:14.5px; margin-top:6px; line-height:1.5; }
+
+  .rate-strip{
+    display:flex; align-items:baseline; gap:8px;
+    margin-top:14px; padding:10px 14px;
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    font-family:'IBM Plex Mono', monospace; font-size:13px;
+  }
+  .rate-strip .dot{
+    width:6px; height:6px; border-radius:50%; background:var(--teal);
+    display:inline-block; flex:none;
+    animation:pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+  .rate-strip .lbl{ color:var(--muted); font-family:'Archivo',sans-serif; }
+  .rate-strip .val{ font-weight:600; font-variant-numeric:tabular-nums; }
+
+  .modes{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:20px 0; }
+  .mode-btn{
+    appearance:none; border:1px solid var(--line); border-radius:14px;
+    padding:16px 14px; text-align:left; cursor:pointer;
+    background:var(--surface); color:var(--ink);
+    display:flex; flex-direction:column; gap:10px;
+    transition:transform .12s ease, box-shadow .12s ease;
+    font-family:inherit;
+  }
+  .mode-btn:active{ transform:scale(.98); }
+  .mode-btn:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  .mode-btn .chip{
+    width:34px; height:34px; border-radius:9px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;
+  }
+  .mode-btn.cpu .chip{ background:var(--amber-ink); color:var(--amber); }
+  .mode-btn.gpu .chip{ background:var(--teal-ink); color:var(--teal); }
+  .mode-btn .m-title{ font-weight:600; font-size:14.5px; line-height:1.3; }
+  .mode-btn .m-sub{ font-size:12px; color:var(--muted); }
+  .mode-btn[disabled]{ opacity:.55; cursor:default; }
+  .mode-btn.active{ box-shadow:0 0 0 2px var(--ink) inset; }
+
+  .status{
+    display:none; align-items:center; gap:10px;
+    font-size:13.5px; color:var(--muted); margin:4px 0 18px;
+    padding:10px 4px;
+  }
+  .status.show{ display:flex; }
+  .spinner{
+    width:14px; height:14px; border-radius:50%; flex:none;
+    border:2px solid var(--line); border-top-color:var(--ink);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .results-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin:24px 0 10px; padding-top:18px; border-top:1px solid var(--line);
+  }
+  .results-head h2{ font-size:16px; font-weight:600; }
+  .results-head .count{ font-size:12px; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+  .example-flag{
+    display:inline-block; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--amber); border:1px solid var(--amber); border-radius:999px;
+    padding:2px 8px; margin-left:8px; font-family:'Archivo',sans-serif; font-weight:600;
+    vertical-align:middle;
+  }
+
+  .ticket{
+    display:flex; align-items:center; gap:12px;
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:10px; box-shadow:var(--shadow);
+  }
+  .ticket .rank{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);
+    width:20px; flex:none; text-align:center;
+  }
+  .ticket .info{ flex:1; min-width:0; }
+  .ticket .name{
+    font-size:13.5px; line-height:1.35; font-weight:500;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .ticket .price-row{
+    display:flex; align-items:baseline; gap:8px; margin-top:6px;
+    font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;
+  }
+  .ticket .eur{ font-size:15px; font-weight:600; }
+  .ticket .try{ font-size:12px; color:var(--muted); }
+  .ticket a.go{
+    flex:none; width:34px; height:34px; border-radius:9px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--paper); border:1px solid var(--line); color:var(--ink);
+    text-decoration:none; font-size:16px;
+  }
+
+  .empty, .error{
+    font-size:13.5px; color:var(--muted); padding:16px 4px;
+  }
+  .error{ color:var(--amber); }
+
+  footer{
+    margin-top:26px; padding-top:14px; border-top:1px solid var(--line);
+    font-size:11.5px; color:var(--muted); line-height:1.6;
+  }
+  footer a{ color:var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Skroutz.gr · Selanik</div>
+  <h1>Selanik Fiyat Panosu</h1>
+  <p class="sub">Selanik'teki büyük teknoloji mağazalarında satılan laptopları anlık tarar, EUR fiyatını güncel kurla TL'ye çevirir.</p>
+  <div class="rate-strip">
+    <span class="dot"></span>
+    <span class="lbl">EUR → TRY</span>
+    <span class="val" id="rate-val">…</span>
+  </div>
+</header>
+
+<div class="modes">
+  <button class="mode-btn cpu" id="btn-cpu" onclick="runSearch('cpu')">
+    <span class="chip">AI9</span>
+    <span class="m-title">Ryzen AI 9 365+</span>
+    <span class="m-sub">365 / HX 370 / HX 375 işlemciler</span>
+  </button>
+  <button class="mode-btn gpu" id="btn-gpu" onclick="runSearch('gpu')">
+    <span class="chip">RTX</span>
+    <span class="m-title">RTX 5070 Ti / 5080 / 5090</span>
+    <span class="m-sub">12GB+ ekran kartı belleği</span>
+  </button>
+</div>
+
+<div class="status" id="status">
+  <span class="spinner"></span>
+  <span id="status-text">Skroutz.gr taranıyor…</span>
+</div>
+
+<div class="results-head">
+  <h2 id="results-title">Ryzen AI 9 365+ işlemcili laptoplar</h2>
+  <span class="count" id="results-count"></span>
+</div>
+<div id="results"></div>
+
+<footer>
+  En ucuz 5 sonuç gösterilir. Fiyatlar Skroutz.gr'nin canlı fiyat karşılaştırmasından, kur Avrupa Merkez Bankası verisine dayanan Frankfurter API'sinden alınır. Bir tarama 1-3 dakika sürebilir.
+</footer>
+
+<script>
+  const API_BASE = "https://fiyat-takip-otomasyonu.onrender.com";
+
+  const EXAMPLE = {
+    cpu: {
+      title: "Ryzen AI 9 365+ işlemcili laptoplar",
+      rate: 56.1177,
+      total: 9,
+      laptops: [
+        {name:"HP OmniBook Ultra 14-fd0007nn 14\" (Ryzen AI 300-9 365/16GB/1TB)", price_eur:1129.00, price_try:63356.88, url:"https://www.skroutz.gr/s/58361704/"},
+        {name:"Asus Zenbook S 16 16\" (Ryzen AI 300-9 365/24GB/1TB)", price_eur:1589.26, price_try:89185.62, url:"https://www.skroutz.gr/s/65625339/"},
+        {name:"Acer NB Nitro V AI ANV16-61 16\" (Ryzen AI 300-9 365/32GB/1.0TB)", price_eur:1801.14, price_try:101075.83, url:"https://www.skroutz.gr/s/66389579/"},
+        {name:"Acer NB Nitro V AI ANV16-61 16\" (Ryzen AI 300-9 365/32GB/1.0TB)", price_eur:1829.43, price_try:102663.40, url:"https://www.skroutz.gr/s/66389579-2/"},
+        {name:"Asus Zenbook S16 16\" (Ryzen AI 300-9 465/32GB/1TB)", price_eur:2544.77, price_try:142806.64, url:"https://www.skroutz.gr/s/69022787/"}
+      ]
+    },
+    gpu: {
+      title: "RTX 5070 Ti/5080/5090 laptoplar",
+      rate: 56.1177,
+      total: 159,
+      laptops: [
+        {name:"Acer Nitro 16S AI AN16S-61 16\" (Ryzen AI 300-7 350/1TB) — RTX 5070 Ti", price_eur:2010.30, price_try:112838.14, url:"https://www.skroutz.gr/s/65073477/"},
+        {name:"MSI Vector A16 HX A8WHG-004US 16\" (Ryzen 9-8940HX/16GB/1TB) — RTX 5070 Ti", price_eur:2141.68, price_try:120211.11, url:"https://www.skroutz.gr/s/64237464/"},
+        {name:"MSI Vector 16 HX AI A2XWHG 16\" (Ultra 7-255HX/16GB/512GB) — RTX 5070 Ti", price_eur:2199.00, price_try:123433.83, url:"https://www.skroutz.gr/s/60582285/"},
+        {name:"Asus ROG Strix G16 16\" (Ryzen 9-8940HX/16GB/1TB) — RTX 5070 Ti", price_eur:2229.37, price_try:125138.71, url:"https://www.skroutz.gr/s/63008827/"},
+        {name:"MSI Vector 16 HX AI A2XWHG 16\" (Ultra 7-255HX) — RTX 5070 Ti", price_eur:2389.00, price_try:134100.86, url:"https://www.skroutz.gr/s/61011647/"}
+      ]
+    }
+  };
+
+  let currentMode = "cpu";
+  let polling = null;
+
+  function fmtEur(v){
+    return new Intl.NumberFormat('el-GR', {minimumFractionDigits:2, maximumFractionDigits:2}).format(v) + " €";
+  }
+  function fmtTry(v){
+    return "~" + new Intl.NumberFormat('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}).format(v) + " TL";
+  }
+
+  function renderResults(data, isExample){
+    document.getElementById('results-title').textContent = data.title;
+    const countEl = document.getElementById('results-count');
+    countEl.innerHTML = `${data.total} sonuç` + (isExample ? ' <span class="example-flag">Örnek</span>' : '');
+
+    const wrap = document.getElementById('results');
+    if(!data.laptops.length){
+      wrap.innerHTML = `<div class="empty">Bu kritere uyan bir laptop bulunamadı.</div>`;
+      return;
+    }
+    wrap.innerHTML = data.laptops.map((l, i) => `
+      <div class="ticket">
+        <span class="rank">${i+1}</span>
+        <div class="info">
+          <div class="name">${l.name}</div>
+          <div class="price-row">
+            <span class="eur">${fmtEur(l.price_eur)}</span>
+            <span class="try">${fmtTry(l.price_try)}</span>
+          </div>
+        </div>
+        <a class="go" href="${l.url}" target="_blank" rel="noopener">↗</a>
+      </div>
+    `).join('');
+  }
+
+  function setStatus(show, text){
+    const s = document.getElementById('status');
+    s.classList.toggle('show', show);
+    if(text) document.getElementById('status-text').textContent = text;
+  }
+
+  function setButtons(disabled, activeMode){
+    document.getElementById('btn-cpu').disabled = disabled;
+    document.getElementById('btn-gpu').disabled = disabled;
+    document.getElementById('btn-cpu').classList.toggle('active', activeMode === 'cpu');
+    document.getElementById('btn-gpu').classList.toggle('active', activeMode === 'gpu');
+  }
+
+  async function runSearch(mode){
+    currentMode = mode;
+    if(polling) clearInterval(polling);
+    setButtons(true, mode);
+    setStatus(true, "İstek gönderildi, Skroutz.gr taranıyor…");
+    document.getElementById('results-count').textContent = '';
+
+    try{
+      const startRes = await fetch(`${API_BASE}/api/search`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({type: mode})
+      });
+      if(!startRes.ok) throw new Error('İstek başlatılamadı (' + startRes.status + ')');
+      const {job_id} = await startRes.json();
+
+      let ticks = 0;
+      polling = setInterval(async () => {
+        ticks++;
+        try{
+          const r = await fetch(`${API_BASE}/api/result/${job_id}`);
+          const job = await r.json();
+          if(job.status === 'running'){
+            if(ticks > 4) setStatus(true, "Hâlâ aranıyor… (Selanik'teki mağazalar taranıyor)");
+            if(ticks > 100){ // ~5dk
+              clearInterval(polling);
+              setStatus(false);
+              document.getElementById('results').innerHTML = `<div class="error">Zaman aşımı - tekrar dener misin?</div>`;
+              setButtons(false, mode);
+            }
+            return;
+          }
+          clearInterval(polling);
+          setStatus(false);
+          setButtons(false, mode);
+          if(job.status === 'error'){
+            document.getElementById('results').innerHTML = `<div class="error">Bir hata oldu: ${job.data}</div>`;
+            return;
+          }
+          renderResults({title: job.data.baslik, rate: job.data.rate, total: job.data.total, laptops: job.data.laptops}, false);
+          document.getElementById('rate-val').textContent = job.data.rate.toFixed(4);
+        }catch(e){
+          clearInterval(polling);
+          setStatus(false);
+          setButtons(false, mode);
+          document.getElementById('results').innerHTML = `<div class="error">Bağlantı hatası: ${e.message}</div>`;
+        }
+      }, 3000);
+    }catch(e){
+      setStatus(false);
+      setButtons(false, mode);
+      document.getElementById('results').innerHTML = `<div class="error">Bir hata oldu: ${e.message}</div>`;
+    }
+  }
+
+  async function loadLiveRate(){
+    try{
+      const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=TRY');
+      const j = await r.json();
+      document.getElementById('rate-val').textContent = j.rates.TRY.toFixed(4);
+    }catch(e){
+      document.getElementById('rate-val').textContent = EXAMPLE.cpu.rate.toFixed(4);
+    }
+  }
+
+  // İlk açılış: örnek veriyle (gerçek, önceden çekilmiş) at-rest durumu göster.
+  renderResults(EXAMPLE.cpu, true);
+  setButtons(false, 'cpu');
+  loadLiveRate();
+</script>
+</body>
+</html>
