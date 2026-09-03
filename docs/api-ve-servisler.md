@@ -39,20 +39,25 @@ robots.txt kurallarına uyularak.
 
 ## Laptop Fiyat Karşılaştırma Botu (`laptop-arama/`)
 
+**Aktif sistem:** Selanik (Yunanistan) araması, `search_laptops_greece.py`.
+**Devre dışı (kod duruyor, bağlı değil):** Türkiye vs. İngiltere karşılaştırması,
+`search_laptops.py` + `search_laptops_tr.py` + `matcher.py`.
+
 ### Veri kaynakları
 
 | Kaynak | URL | Yöntem | Not |
 |---|---|---|---|
-| Amazon.com.tr | amazon.com.tr | Playwright | Türkiye laptop fiyatları |
-| n11.com | n11.com | Playwright | Türkiye laptop fiyatları - düz `requests` Render'ın IP'sinden 403 alıyordu, Playwright'a geçildi |
-| [PriceRunner](https://www.pricerunner.com/) | pricerunner.com | Playwright | İngiltere merkezli, çoklu mağaza fiyat karşılaştırma sitesi - "yurtdışı/Avrupa" fiyat kaynağı |
+| [Skroutz.gr](https://www.skroutz.gr/) | skroutz.gr | Playwright | **Aktif kaynak.** Yunanistan'ın ana fiyat karşılaştırma sitesi - Public, Kotsovolos, Plaisio gibi Selanik'te de mağazası olan büyük zincirleri tek yerde topluyor. robots.txt'inde ClaudeBot'a özel bir bölüm var (temiz `.html` kategori sayfalarına izin, sorgu parametreli sayfalara yok) - buna kendi politikamız olarak uyuluyor. |
+| Amazon.com.tr | amazon.com.tr | Playwright | *Devre dışı sistemde* - Türkiye laptop fiyatları |
+| n11.com | n11.com | Playwright | *Devre dışı sistemde* - Türkiye laptop fiyatları |
+| [PriceRunner](https://www.pricerunner.com/) | pricerunner.com | Playwright | *Devre dışı sistemde* - İngiltere merkezli fiyat karşılaştırma sitesi |
 
 ### Yardımcı API'ler
 
 | API | Ne için | Kimlik doğrulama | Not |
 |---|---|---|---|
-| [Frankfurter API](https://www.frankfurter.dev/) (`api.frankfurter.app`) | Güncel GBP→TL döviz kuru | Yok (ücretsiz, key gerektirmiyor) | Avrupa Merkez Bankası verisine dayanıyor |
-| [Telegram Bot API](https://core.telegram.org/bots/api) | Anlık soru-cevap botu (webhook) | Bot token (BotFather'dan, `ssdfiyat_bot`'tan AYRI bir bot) | Bot kullanıcı adı için sana sorulmalı - `LAPTOP_TELEGRAM_BOT_TOKEN`, `LAPTOP_TELEGRAM_ALLOWED_CHAT_IDS` |
+| [Frankfurter API](https://www.frankfurter.dev/) (`api.frankfurter.app`) | Güncel EUR→TL (aktif sistem) / GBP→TL (devre dışı sistem) döviz kuru | Yok (ücretsiz, key gerektirmiyor) | Avrupa Merkez Bankası verisine dayanıyor |
+| [Telegram Bot API](https://core.telegram.org/bots/api) | Anlık soru-cevap botu (webhook) | Bot token (BotFather'dan, `ssdfiyat_bot`'tan AYRI bir bot) | `LAPTOP_TELEGRAM_BOT_TOKEN`, `LAPTOP_TELEGRAM_ALLOWED_CHAT_IDS`. Mesajda "ryzen" geçerse Ryzen AI 9 365+ araması, "teşekkür" geçerse RTX 5070 Ti/5080/5090 araması tetikleniyor |
 
 ### Altyapı
 

@@ -43,21 +43,37 @@ olarak duruyor, kullanılmıyor).
 - Repo **public** - GitHub Actions'ın ücretsiz dakika kotası private
   repolarda sınırlı, 10 dakikalık bir cron için yetmiyordu.
 
-## Sistem 2: Laptop Fiyat Karşılaştırma Botu (`laptop-arama/`, isteğe bağlı)
+## Sistem 2: Laptop Arama Botu (`laptop-arama/`, isteğe bağlı)
 
-**Ne yapıyor:** RTX 5070 Ti/5080/5090 (12GB+ VRAM) laptopların Türkiye
-(Amazon.com.tr + n11) ve Avrupa (PriceRunner UK, 3 kategori) fiyatlarını
-karşılaştırır - ama Sistem 1 gibi sürekli değil, sadece Telegram'dan
-sorulduğunda (webhook ile anlık tetiklenir).
+**Şu an AKTİF olan:** Selanik (Yunanistan) laptop araması, `search_laptops_greece.py`
+üzerinden Skroutz.gr'de. İki ayrı sorgu var, `webhook_app.py`'de mesaj
+içeriğine göre dallanıyor:
+- Mesajda **"ryzen"** geçiyorsa → `search_by_cpu()` - Ryzen AI 9 365+ işlemcili laptoplar
+- Mesajda **"teşekkür"** geçiyorsa → `search_by_gpu()` - RTX 5070 Ti/5080/5090 laptoplar
+- Başka bir şey yazılırsa → kısa bir yönlendirme mesajı, arama yapılmaz
 
-**Neden ayrı klasör:** Kullanıcı isteği - iki sistem birbirinden bağımsız
-olsun, biri kapatılırsa/silinirse diğeri etkilenmesin.
+Sonuç formatı: mani + her laptop için ad, EUR fiyatı, güncel kurla TL
+karşılığı, link. TR ile karşılaştırma YOK - sadece Selanik fiyatlarının
+düz listesi.
+
+**Devre dışı (kod duruyor ama bota bağlı değil):** Eski Türkiye vs.
+İngiltere (PriceRunner) karşılaştırma sistemi - `search_laptops.py`,
+`search_laptops_tr.py`, `matcher.py`. Kullanıcı "eskisi dursun ama aktif
+olmasın, istediğimizde devreye alırız" dedi - silinmedi, sadece
+`webhook_app.py` artık bunları çağırmıyor. Geri almak istenirse
+`webhook_app.py`'ye bu üçünü tekrar import edip bir üçüncü anahtar kelimeye
+bağlamak yeterli.
+
+**Neden ayrı klasör:** Kullanıcı isteği - iki sistem (SSD/harici disk ve
+laptop) birbirinden bağımsız olsun, biri kapatılırsa/silinirse diğeri
+etkilenmesin.
 
 **Mimari:** Telegram → webhook (anlık, POST isteği) → `laptop-arama/
 webhook_app.py` (Flask, Render.com'da 7/24 çalışıyor) → arka planda
-`search_laptops_tr.py` + `search_laptops.py` çalışır → `matcher.py` ile
-eşleştirilir → `currency.py` ile güncel kur çekilir → `manis.py`'den
-rastgele bir mani eklenir → sonuç Telegram'a gönderilir.
+`search_laptops_greece.py` çalışır → `currency.py` ile güncel EUR→TL kuru
+çekilir → `manis.py`'den rastgele bir mani eklenir → sonuç Telegram'a
+gönderilir (4096 karakteri aşan sonuçlar `send_long_message` ile bölünüp
+gönderiliyor).
 
 **Neden webhook, polling değil:** İlk kurulan sistem GitHub Actions ile
 5 dakikada bir "yeni mesaj var mı" diye soruyordu (polling) - ama GitHub'ın
@@ -76,21 +92,41 @@ Environment/Language **Docker** olarak seçilmeli (Render dashboard'u
 mevcut bir servisin runtime'ını sonradan değiştirmeyi desteklemiyor -
 yanlış seçilirse servisi silip yeniden oluşturmak gerekiyor).
 
-**Eşleştirme mantığı (`matcher.py`):** Marka + bilinen ürün serisi adı
-(Stealth/Vector/Legion/ROG Strix vb.) aynıysa eşleşme kabul edilir; model
-kodu da (örn. "A2XWHG") örtüşüyorsa "kesin", örtüşmüyorsa "yaklaşık" olarak
-etiketlenir. Sadece model koduna güvenmek YANLIŞ eşleşmeler üretmişti
-(farklı seri, tesadüfen aynı kod parçası) - bu yüzden marka+seri şartı
-eklendi.
+**Skroutz.gr ve ClaudeBot:** Skroutz'un robots.txt'inde özellikle ClaudeBot
+için bir bölüm var - temiz `/c/*.html` kategori sayfalarına izin veriyor,
+sorgu parametreli (`?...`) sayfalara vermiyor. Gerçekten Claude olduğumuz
+için bu kurallara (literal "ClaudeBot" User-Agent'ı göndermesek de) kendi
+politikamız olarak uyuyoruz - `search_laptops_greece.py`'deki tüm URL'ler
+temiz `.html` kategori sayfaları, arama sorgusu değil.
 
-**Bilinen sınırlamalar:**
+**(Devre dışı sistemdeki) eşleştirme mantığı (`matcher.py`):** Marka +
+bilinen ürün serisi adı (Stealth/Vector/Legion/ROG Strix vb.) aynıysa
+eşleşme kabul edilir; model kodu da (örn. "A2XWHG") örtüşüyorsa "kesin",
+örtüşmüyorsa "yaklaşık" olarak etiketlenir. Sadece model koduna güvenmek
+YANLIŞ eşleşmeler üretmişti (farklı seri, tesadüfen aynı kod parçası) - bu
+yüzden marka+seri şartı eklendi. Aktif Selanik sisteminde eşleştirme YOK,
+sadece düz listeleme var.
+
+**Bilinen sınırlamalar / geçmişte çözülen Render sorunları:**
 - Amazon.com.tr ve n11 arama sonuçları istekten isteğe değişkenlik
-  gösterebiliyor (reklam/sıralama rotasyonu) - bazen eşleşme çıkar, bazen
-  çıkmaz, bu normal.
+  gösterebiliyor (reklam/sıralama rotasyonu).
 - Render'ın ücretsiz katmanı 15 dakika hareketsizlikten sonra uykuya geçiyor
   - ilk mesajda ~30-50 saniyelik "uyanma" gecikmesi olabilir.
-- Render'ın ücretsiz RAM'i (512MB) sınırda - Chromium için tam yeterli
-  olmayabilir, sorun çıkarsa ilk bakılacak yer burası.
+- **512MB RAM sınırında OOM (bellek yetersizliği) çöküşü yaşandı** - art
+  arda 5 ayrı Chromium açıp kapatmak süreci çökertiyordu (loglarda uzun
+  sessizlik + otomatik yeniden başlama görülür). Çözüm:
+  `core/scrapers/_browser.py`'deki `fetch_multiple_rendered_html()` TEK
+  Chromium'u paylaşarak birden fazla sayfa açıyor, ayrıca
+  `--disable-dev-shm-usage` gibi konteyner-dostu launch bayrakları eklendi.
+  Yeni bir çoklu-sayfa taraması eklenecekse bu fonksiyonu kullan, her sayfa
+  için ayrı `fetch_rendered_html()` çağırma.
+- **Telegram'ın 4096 karakter/mesaj sınırı** aşılınca mesaj sessizce
+  kayboluyordu (Telegram reddediyor, `requests.post()` HTTP açısından
+  başarılı görünüyordu). Çözüm: `send_message()` artık Telegram'ın JSON
+  cevabındaki `ok` alanını kontrol ediyor, `send_long_message()` uzun
+  sonuçları ürün bloklarını bölmeden parçalara ayırıyor. Yeni bir mesaj
+  gönderme noktası eklenirse `send_message` yerine `send_long_message`
+  kullan (veya en azından `ok` kontrolü yap).
 
 ## Genel kod kuralları (her iki sistem için)
 
