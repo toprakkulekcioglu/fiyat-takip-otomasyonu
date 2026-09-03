@@ -96,8 +96,25 @@ def format_greece_results(laptops: list[dict], rate: float, baslik: str) -> str:
     return "\n".join(lines)
 
 
+_search_lock = threading.Lock()
+
+
 def handle_greece_query(chat_id: str, search_fn, baslik: str) -> None:
-    """Arka planda çalışır - Telegram'ı (ve kullanıcıyı) bekletmemek için ayrı thread'de."""
+    """Arka planda çalışır - Telegram'ı (ve kullanıcıyı) bekletmemek için ayrı thread'de.
+
+    Aynı anda sadece BİR arama çalışabilir (_search_lock) - Render'ın 512MB'lık
+    ücretsiz sunucusunda, art arda gelen birden fazla sorgu her biri kendi
+    Chromium'unu açarsa bellek yetersizliğinden süreç çöküyordu (birden fazla
+    tarayıcı aynı anda RAM'i tüketiyordu). Kilit boştaysa sorgu sıraya girip
+    bekliyor, kullanıcı da bunu bir mesajla öğreniyor."""
+    if not _search_lock.acquire(blocking=False):
+        print(f"Baska bir arama surerken yeni sorgu geldi ({chat_id}) - bekletiliyor.", flush=True)
+        try:
+            send_message(chat_id, "Şu anda başka bir arama sürüyor, senin sıran gelince otomatik başlayacak...")
+        except Exception as e:
+            print(f"BEKLEME MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
+        _search_lock.acquire()  # sırada bekle
+
     try:
         laptops = search_fn()
         print(f"Selanik taramasi: {len(laptops)} urun bulundu", flush=True)
@@ -116,6 +133,8 @@ def handle_greece_query(chat_id: str, search_fn, baslik: str) -> None:
             send_message(chat_id, f"Bir hata oldu, tekrar dener misin? ({e})")
         except Exception as e2:
             print(f"HATA MESAJI DA GONDERILEMEDI: {type(e2).__name__}: {e2}", flush=True)
+    finally:
+        _search_lock.release()
 
 
 @app.route("/telegram-webhook", methods=["POST"])
