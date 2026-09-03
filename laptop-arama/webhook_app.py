@@ -1,13 +1,21 @@
-"""Telegram webhook ile ÇALIŞAN, anlık cevap veren laptop karşılaştırma botu.
+"""Telegram webhook ile ÇALIŞAN, anlık cevap veren laptop arama botu.
 
-polling yapan telegram_bot.py'nin yerine geçiyor - bu, Render.com gibi 7/24 açık
-bir sunucuda sürekli çalışan bir web servisi. Telegram, mesaj geldiği an bu
-servise kendisi POST isteği atıyor (biz sormuyoruz, o bize söylüyor) - bu yüzden
-gerçekten anlık.
+Render.com gibi 7/24 açık bir sunucuda sürekli çalışan bir web servisi.
+Telegram, mesaj geldiği an bu servise kendisi POST isteği atıyor (biz
+sormuyoruz, o bize söylüyor) - bu yüzden gerçekten anlık.
 
 Önemli: Telegram bir bot için AYNI ANDA hem webhook hem polling (getUpdates)
-kullanmana izin vermiyor. Bu devreye girince eski GitHub Actions polling
-workflow'u devre dışı bırakıldı.
+kullanmana izin vermiyor.
+
+Anahtar kelimeyle dallanma:
+- "ryzen" geçen mesaj  -> Selanik (Yunanistan), Ryzen AI 9 365+ işlemcili laptoplar
+- "teşekkür" geçen mesaj -> Selanik (Yunanistan), RTX 5070 Ti/5080/5090 laptoplar
+- Diğer her şey -> kısa bir yönlendirme mesajı
+
+Not: Eski sistem (Türkiye vs. yurtdışı/İngiltere PriceRunner karşılaştırması,
+search_laptops.py + search_laptops_tr.py + matcher.py) SİLİNMEDİ, kod olarak
+duruyor ama bu bota bağlı DEĞİL - devre dışı. İstenirse tekrar bir anahtar
+kelimeye bağlanıp aktif edilebilir.
 """
 import os
 import sys
@@ -20,12 +28,11 @@ from flask import Flask, request
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
-from currency import gbp_to_try_rate
+from currency import eur_to_try_rate
 from manis import rastgele_mani
-from matcher import match
 from notifier import load_dotenv
-from search_laptops import search as search_global
-from search_laptops_tr import search as search_tr
+from search_laptops_greece import search_by_cpu as greece_search_by_cpu
+from search_laptops_greece import search_by_gpu as greece_search_by_gpu
 
 load_dotenv()
 
@@ -72,53 +79,34 @@ def send_long_message(chat_id: str, text: str) -> None:
         send_message(chat_id, chunk)
 
 
-def format_results(pairs: list[dict], rate: float) -> str:
-    lines = [rastgele_mani(), ""]
+def format_greece_results(laptops: list[dict], rate: float, baslik: str) -> str:
+    lines = [rastgele_mani(), "", baslik, ""]
 
-    if not pairs:
-        lines.append(
-            "Şu an Türkiye ve yurtdışı kataloglarında eşleştirilebilen 12GB+ "
-            "RTX 50 serisi (5070 Ti/5080/5090) laptop bulunamadı - bu GPU'lar "
-            "çok yeni, kataloglar henüz örtüşmüyor olabilir."
-        )
+    if not laptops:
+        lines.append("Şu an bu kritere uyan bir laptop bulunamadı.")
         return "\n".join(lines)
 
-    for pair in pairs:
-        tr = pair["tr"]
-        glb = pair["global"]
-        try_equivalent = glb["price_gbp"] * rate
-        etiket = (
-            "(kesin eşleşme - aynı model kodu)"
-            if pair["confidence"] == "high"
-            else "(yaklaşık eşleşme - aynı seri, yapılandırma farklı olabilir, almadan önce kontrol et)"
-        )
-        lines.append(f"{tr['name']}  {etiket}")
-        lines.append(f"Türkiye: {tr['price_try']:,.2f} TL")
-        lines.append(f"{tr['url']}")
-        lines.append(
-            f"Yurtdışı: £{glb['price_gbp']:,.2f} (~{try_equivalent:,.2f} TL, güncel kur: {rate:.2f})"
-        )
-        lines.append(f"{glb['url']}")
+    for laptop in laptops:
+        try_equivalent = laptop["price_eur"] * rate
+        lines.append(laptop["name"])
+        lines.append(f"{laptop['price_eur']:,.2f} EUR  (~{try_equivalent:,.2f} TL, güncel kur: {rate:.2f})")
+        lines.append(laptop["url"])
         lines.append("")
 
     return "\n".join(lines)
 
 
-def handle_query(chat_id: str) -> None:
+def handle_greece_query(chat_id: str, search_fn, baslik: str) -> None:
     """Arka planda çalışır - Telegram'ı (ve kullanıcıyı) bekletmemek için ayrı thread'de."""
     try:
-        tr_laptops = search_tr()
-        print(f"TR taramasi: {len(tr_laptops)} urun bulundu", flush=True)
-        global_laptops = search_global()
-        print(f"Global tarama: {len(global_laptops)} urun bulundu", flush=True)
-        pairs = match(tr_laptops, global_laptops)
-        print(f"Eslesme: {len(pairs)}", flush=True)
+        laptops = search_fn()
+        print(f"Selanik taramasi: {len(laptops)} urun bulundu", flush=True)
 
         print("Kur cekiliyor...", flush=True)
-        rate = gbp_to_try_rate()
+        rate = eur_to_try_rate()
         print(f"Kur alindi: {rate}", flush=True)
 
-        text = format_results(pairs, rate)
+        text = format_greece_results(laptops, rate, baslik)
         print(f"Mesaj hazir ({len(text)} karakter), gonderiliyor...", flush=True)
         send_long_message(chat_id, text)
         print("Mesaj gonderildi.", flush=True)
@@ -142,12 +130,31 @@ def telegram_webhook():
         print(f"Tanınmayan chat_id ({chat_id}) - yok sayıldı.")
         return "ok", 200
 
-    print(f"Sorgu alındı ({chat_id}): {message.get('text', '')!r}")
+    text = message.get("text", "")
+    print(f"Sorgu alındı ({chat_id}): {text!r}")
+    lowered = text.lower()
+
+    if "ryzen" in lowered:
+        search_fn, baslik = greece_search_by_cpu, "Selanik - Ryzen AI 9 365+ işlemcili laptoplar"
+    elif "teşekkür" in lowered or "tesekkur" in lowered:
+        search_fn, baslik = greece_search_by_gpu, "Selanik - RTX 5070 Ti/5080/5090 laptoplar"
+    else:
+        try:
+            send_message(
+                chat_id,
+                "Ne aramamı istediğini anlamadım.\n\n"
+                "'ryzen' yaz: Ryzen AI 9 365+ işlemcili laptoplar (Selanik)\n"
+                "'teşekkür' yaz: RTX 5070 Ti/5080/5090 laptoplar (Selanik)",
+            )
+        except Exception as e:
+            print(f"YONLENDIRME MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
+        return "ok", 200
+
     try:
         send_message(chat_id, "İstek gönderildi, aranıyor...")
     except Exception as e:
         print(f"ACK MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
-    threading.Thread(target=handle_query, args=(chat_id,), daemon=True).start()
+    threading.Thread(target=handle_greece_query, args=(chat_id, search_fn, baslik), daemon=True).start()
     return "ok", 200
 
 
