@@ -79,6 +79,9 @@ def send_long_message(chat_id: str, text: str) -> None:
         send_message(chat_id, chunk)
 
 
+MAX_RESULTS = 5  # En ucuzdan bu kadarı önerilsin - tam liste yerine
+
+
 def format_greece_results(laptops: list[dict], rate: float, baslik: str) -> str:
     lines = [rastgele_mani(), "", baslik, ""]
 
@@ -86,12 +89,15 @@ def format_greece_results(laptops: list[dict], rate: float, baslik: str) -> str:
         lines.append("Şu an bu kritere uyan bir laptop bulunamadı.")
         return "\n".join(lines)
 
-    for laptop in laptops:
+    for laptop in laptops[:MAX_RESULTS]:
         try_equivalent = laptop["price_eur"] * rate
         lines.append(laptop["name"])
         lines.append(f"{laptop['price_eur']:,.2f} EUR  (~{try_equivalent:,.2f} TL, güncel kur: {rate:.2f})")
         lines.append(laptop["url"])
         lines.append("")
+
+    if len(laptops) > MAX_RESULTS:
+        lines.append(f"(Toplam {len(laptops)} sonuç bulundu, en ucuz {MAX_RESULTS} tanesi gösterildi.)")
 
     return "\n".join(lines)
 
