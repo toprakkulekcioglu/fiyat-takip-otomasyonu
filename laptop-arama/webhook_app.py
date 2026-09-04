@@ -34,6 +34,7 @@ from manis import rastgele_mani
 from notifier import load_dotenv
 from search_laptops_greece import search_by_cpu as greece_search_by_cpu
 from search_laptops_greece import search_by_gpu as greece_search_by_gpu
+from subscription_api import subscription_api
 
 load_dotenv()
 
@@ -44,6 +45,10 @@ ALLOWED_CHAT_IDS = {
 API_BASE = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 app = Flask(__name__)
+# SSD/harici disk takip sisteminin web sayfası (web/ssd-takip.html) için
+# /api/track, /api/subscriptions route'ları - ayrı bir Render servisi açmamak
+# için bu zaten 7/24 açık olan servise ekleniyor, bkz. core/subscription_api.py.
+app.register_blueprint(subscription_api)
 
 
 TELEGRAM_MAX_LEN = 4096  # Telegram'ın tek mesaj için karakter sınırı

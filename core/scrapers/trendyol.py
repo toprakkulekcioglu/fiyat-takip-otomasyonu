@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from scrapers._browser import fetch_rendered_html
+from scrapers._embedded_json import extract_balanced_json
 from scrapers._price import MIN_PLAUSIBLE_PRICE, is_nvme, is_ssd, parse_try
 
 SITE = "Trendyol"
@@ -65,6 +66,31 @@ def scrape_all() -> list[dict]:
     for capacity in URLS:
         results.extend(scrape(capacity))
     return results
+
+
+def scrape_product(url: str) -> dict | None:
+    """Kullanıcının verdiği tekil bir ürün linkinden ad+fiyat çeker.
+
+    Trendyol ürün sayfasında satır içi bir <script>, sayfanın kendi state'ini
+    window["__envoy__SHARED_PROPS"] altında JSON olarak taşıyor - DOM'daki fiyat
+    metni "Trendyol Plus'a Özel sepette" gibi üyelik bazlı indirimli fiyatı
+    gösterebiliyor, bu yüzden asıl satış fiyatı için bu JSON'daki
+    merchantListing.winnerVariant.price.sellingPrice kullanılıyor.
+    """
+    html = fetch_rendered_html(url, wait_selector="h1")
+    data = extract_balanced_json(html, '__envoy__SHARED_PROPS"]')
+    if not data or "product" not in data:
+        return None
+
+    product = data["product"]
+    try:
+        price = product["merchantListing"]["winnerVariant"]["price"]["sellingPrice"]["value"]
+    except (KeyError, TypeError):
+        return None
+    name = product.get("name")
+    if not name or price is None:
+        return None
+    return {"name": name, "price": float(price)}
 
 
 if __name__ == "__main__":

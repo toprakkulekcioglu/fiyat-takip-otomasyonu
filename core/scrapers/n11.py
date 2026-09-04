@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from scrapers._browser import fetch_rendered_html
 from scrapers._price import MIN_PLAUSIBLE_PRICE, is_nvme, is_ssd, parse_try
 
 SITE = "n11.com"
@@ -58,6 +59,26 @@ def scrape_all() -> list[dict]:
         results.extend(scrape(capacity))
         time.sleep(2)
     return results
+
+
+def scrape_product(url: str) -> dict | None:
+    """Kullanıcının verdiği tekil bir ürün linkinden ad+fiyat çeker.
+
+    Kategori sayfalarının aksine (düz `requests` yeterli), ürün sayfasında fiyat
+    Vue.js ile İSTEMCİ tarafında dolduruluyor (ham HTML'de <ins></ins> boş geliyor)
+    - bu yüzden burada Playwright (fetch_rendered_html) gerekiyor.
+    """
+    html = fetch_rendered_html(url, wait_selector=".newPrice ins")
+    soup = BeautifulSoup(html, "html.parser")
+
+    name_el = soup.select_one("h1")
+    price_el = soup.select_one(".newPrice ins")
+    if not name_el or not price_el:
+        return None
+    price = parse_try(price_el.get_text())
+    if price is None:
+        return None
+    return {"name": name_el.get_text(strip=True), "price": price}
 
 
 if __name__ == "__main__":

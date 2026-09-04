@@ -8,9 +8,11 @@ scrape_all() her kategori sayfasını TEK SEFER çekip sonra kapasitelere ayır�
 scrape(capacity) ayrı ayrı çağrılırsa (örn. test amaçlı) aynı sayfa birden fazla
 kez çekilebilir, ama normal akışta (check_and_notify.py) sadece scrape_all() kullanılıyor.
 """
+import json
 import re
 from urllib.parse import urljoin
 
+import requests
 from bs4 import BeautifulSoup
 
 from scrapers._browser import fetch_rendered_html
@@ -80,6 +82,42 @@ def scrape_all() -> list[dict]:
             results.append({**p, "capacity": "2tb-harici"})
 
     return results
+
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+    )
+}
+
+
+def scrape_product(url: str) -> dict | None:
+    """Kullanıcının verdiği tekil bir ürün linkinden ad+fiyat çeker.
+
+    Ürün sayfasında kategori kartlarından FARKLI olarak, sunucu tarafında
+    render edilmiş bir `<script type="application/ld+json">` (Schema.org Product/
+    Offer) var - fiyat DOM'dan değil buradan okunuyor, bu yüzden Playwright'a
+    gerek kalmadan düz `requests` yeterli oluyor.
+    """
+    response = requests.get(url, headers=HEADERS, timeout=15)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            data = json.loads(script.string or "")
+        except json.JSONDecodeError:
+            continue
+        if data.get("@type") != "Product":
+            continue
+        offers = data.get("offers") or {}
+        name = data.get("name")
+        price = offers.get("price")
+        if not name or price is None:
+            continue
+        return {"name": name, "price": float(price)}
+    return None
 
 
 if __name__ == "__main__":

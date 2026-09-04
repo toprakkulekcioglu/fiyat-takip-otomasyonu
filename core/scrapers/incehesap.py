@@ -14,6 +14,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from scrapers._browser import fetch_rendered_html
+from scrapers._embedded_json import extract_balanced_json
 from scrapers._price import MIN_PLAUSIBLE_PRICE, is_nvme
 
 SITE = "incehesap.com"
@@ -71,6 +72,31 @@ def scrape_all() -> list[dict]:
     for capacity in URLS:
         results.extend(scrape(capacity))
     return results
+
+
+def scrape_product(url: str) -> dict | None:
+    """Kullanıcının verdiği tekil bir ürün linkinden ad+fiyat çeker.
+
+    Ürün sayfası, Google Tag Manager için sayfaya gömülü bir
+    `dataLayer.push({"event":"view_item", "ecommerce": {...}})` çağrısı taşıyor -
+    kategori kartlarındaki data-product JSON'undan farklı ama aynı derecede
+    güvenilir bir kaynak, DOM metin ayrıştırmaya gerek kalmıyor.
+    """
+    html = fetch_rendered_html(url, wait_selector="h1", timeout_ms=25000)
+    data = extract_balanced_json(html, 'dataLayer.push({"event":"view_item"')
+    if not data:
+        return None
+
+    ecommerce = data.get("ecommerce", {})
+    items = ecommerce.get("items") or []
+    if not items:
+        return None
+
+    name = items[0].get("item_name")
+    price = ecommerce.get("value")
+    if not name or price is None:
+        return None
+    return {"name": name, "price": float(price)}
 
 
 if __name__ == "__main__":

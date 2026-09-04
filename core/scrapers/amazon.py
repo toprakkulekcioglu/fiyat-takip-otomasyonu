@@ -49,6 +49,22 @@ def scrape_all() -> list[dict]:
     return results
 
 
+def scrape_product(url: str) -> dict | None:
+    """Kullanıcının verdiği tekil bir ürün linkinden ad+fiyat çeker (kategori
+    kartlarından farklı bir sayfa yapısı - #productTitle ve .a-price .a-offscreen)."""
+    html = fetch_rendered_html(url, wait_selector="#productTitle")
+    soup = BeautifulSoup(html, "html.parser")
+
+    name_el = soup.select_one("#productTitle")
+    price_el = soup.select_one(".a-price .a-offscreen")
+    if not name_el or not price_el:
+        return None
+    price = parse_try(price_el.get_text())
+    if price is None:
+        return None
+    return {"name": name_el.get_text(strip=True), "price": price}
+
+
 if __name__ == "__main__":
     for p in scrape_all():
         print(p)

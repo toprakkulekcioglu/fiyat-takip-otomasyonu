@@ -145,6 +145,93 @@ Başta her şey kök dizinde dağınık duruyordu. Sonradan düzenlendi:
 
 ---
 
+## Sistem 1 Genişletmesi: Kullanıcı Bazlı Ürün Takibi (`web/ssd-takip.html`)
+
+**Amaç:** Sabit 1tb/2tb/2tb-harici kategorilerinin ÖTESİNDE, kullanıcının
+istediği herhangi bir ürün linkini (desteklenen 6 siteden) yapıştırıp "bunu
+benim için izle" diyebilmesi - Amazon/CamelCamelCamel'deki fiyat takip
+özelliğine benzer, ama tek dosyalık, kurulum gerektirmeyen bir web sayfası
+üzerinden.
+
+### Her sitede tekil ürün sayfası okuma (`scrape_product`)
+
+Var olan scraper'lar (`core/scrapers/*.py`) sadece KATEGORİ sayfalarını (çok
+ürünlü liste kartları) okuyordu. Kullanıcının verdiği link tek bir ürünün
+sayfası olduğu için her siteye `scrape_product(url)` fonksiyonu eklendi - ve
+her sitenin ürün sayfası, kategori kartlarından TAMAMEN farklı bir HTML/veri
+yapısı kullanıyordu, gerçek sayfalar tarayıcıyla tek tek incelenerek bulundu:
+
+- **Amazon.com.tr**: `#productTitle` + `.a-price .a-offscreen` (kategori
+  kartlarıyla aynı selector aile).
+- **Trendyol**: DOM'daki fiyat metni yanıltıcı olabiliyor ("Trendyol Plus'a
+  Özel sepette X TL" - ücretli üyelik gerektiren bir fiyat). Bunun yerine
+  sayfaya gömülü `window["__envoy__SHARED_PROPS"]` JSON'undaki asıl satış
+  fiyatı (`merchantListing.winnerVariant.price.sellingPrice`) okunuyor.
+- **n11.com**: Kategori sayfası düz `requests` ile çalışıyordu ama ürün
+  sayfasında fiyat Vue.js ile İSTEMCİ tarafında dolduruluyor (ham HTML'de
+  `<ins></ins>` boş geliyor) - bu yüzden burada Playwright gerekiyor, kategori
+  taramasından farklı.
+- **itopya.com**: Fiyat `.product-price-warning-detail` içinde "Sepette X TL"
+  formatında - kampanyalı ürünlerde asıl ödenecek fiyat bu.
+- **incehesap.com**: Sayfaya gömülü bir Google Tag Manager
+  `dataLayer.push({"event":"view_item", ...})` çağrısından okunuyor - kategori
+  kartlarındaki `data-product` JSON'undan farklı ama aynı derecede güvenilir.
+- **Pazarama**: Sayfaya gömülü bir Schema.org `<script type="application/
+  ld+json">` (Product/Offer) bloğundan okunuyor - SEO için eklenen standart
+  bir işaretleme, DOM metin ayrıştırmaya hiç gerek kalmadı.
+
+İç içe süslü parantezli bu JSON'ları (Trendyol, incehesap) güvenilir
+ayrıştırmak için `core/scrapers/_embedded_json.py` yazıldı - regex yerine
+süslü parantez SAYACIYLA dengeli kapanışı buluyor (regex'in ".*?" ile "en
+yakın kapanışı" bulması, iç içe objelerde yanlış yere kesebiliyordu).
+
+### Link → site eşleştirme
+
+`core/site_router.py` bir linkin host'una bakıp doğru `scrape_product`'a
+yönlendiriyor; desteklenmeyen bir site linki gelirse kullanıcıya net bir
+mesajla söyleniyor (bypass denenmiyor - proje prensibi burada da geçerli).
+
+### Abonelikler NEDEN price_history.db'nin dışında ayrı bir dosyada
+
+İlk planda abonelikler de `price_history.db`'ye bir tabloya eklenecekti, ama
+bu dosyayı SADECE GitHub Actions (CI) yazıp git'e geri push ediyor. Kullanıcı
+web sayfasından bir ürün eklediğinde bunu yazan Render'daki canlı sunucu -
+aynı dosyaya CI'dan BAĞIMSIZ olarak paralel yazıp push etseydi, biri
+diğerinin daha yeni verisini ezme riski vardı (git'te "kaybolan" satırlar).
+Çözüm: abonelik listesi ayrı bir dosyada (`data/subscriptions.json`,
+`core/subscriptions_store.py`) - bu dosyayı SADECE Render yazıyor, CI sadece
+okuyor (her çalıştırmasında zaten taze bir git checkout'u alıyor). Tek dosya
+= tek yazan kuralı, çakışma riski yok.
+
+### Render'dan git'e push: GitHub REST API, `git push` değil
+
+Render'ın Docker imajı build-time'da kopyalanmış bir kod anlık görüntüsü -
+içinde çalışan bir git deposu (`.git` + kimlik doğrulama) olduğundan emin
+olamadık. Bunun yerine `core/git_sync.py`, GitHub'ın REST **Contents API**'sini
+kullanıyor: dosyayı base64'e çevirip doğrudan `PUT /repos/.../contents/...`
+ile güncelliyor - yerel bir git deposuna hiç ihtiyaç duymuyor. Bunun için bir
+GitHub Personal Access Token (`GITHUB_PAT` ortam değişkeni, Render'da
+tanımlanması gerekiyor) lazım - tanımlı değilse (örn. yerelde geliştirirken)
+push adımı sessizce atlanıyor, API yine de normal çalışıyor.
+
+### Kapsam bilinçli olarak dar tutuldu
+
+- **Kullanıcı hesabı/login YOK** - tek kişilik kişisel bir araç, sabit 3
+  kategorinin bildirim mantığıyla aynı (tek Telegram/e-posta hedefi).
+- **Fiyat gösterimi canlı taramıyor** - `GET /api/subscriptions` en son bilinen
+  fiyatı `price_history.db`'den okuyor, her sayfa açılışında Playwright
+  beklemek istemedik. Güncel fiyat, `check_and_notify.py`'nin periyodik
+  taramasına eklenen abonelik kontrolüyle tazeleniyor (aynı medyan mantığı,
+  `discount_detector.py`).
+- **Arayüz** (`web/ssd-takip.html`) bir UI Designer agent'ına tasarlattırıldı
+  - "Depo Nöbetçi" kimliği (grafit zemin, tek mavi vurgu rengi, Space
+    Grotesk + JetBrains Mono), `laptop-arama/selanik-fiyat-panosu.html`'nin
+    sıcak/gazete tarzından bilinçli olarak farklı. Aynı teknik iskelet: tek
+    dosya, `fetch()` ile Render'daki backend'e bağlanma, ana ekrana eklenince
+    gerçek bir uygulama gibi açılan PWA meta etiketleri.
+
+---
+
 ## Sistem 2: Laptop Fiyat Karşılaştırma Botu (isteğe bağlı, elle tetiklenen)
 
 **Amaç:** RTX 5070 Ti/5080/5090 (12GB+ ekran kartı belleği) laptopların

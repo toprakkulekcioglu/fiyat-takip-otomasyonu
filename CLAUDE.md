@@ -43,6 +43,19 @@ olarak duruyor, kullanılmıyor).
 - Repo **public** - GitHub Actions'ın ücretsiz dakika kotası private
   repolarda sınırlı, 10 dakikalık bir cron için yetmiyordu.
 
+**Genişletme - kullanıcı bazlı ürün takibi (`web/ssd-takip.html`):** Sabit 3
+kategorinin ÖTESİNDE, kullanıcı 6 desteklenen siteden herhangi bir ürün
+linkini web sayfasından yapıştırıp takibe alabiliyor (`core/subscription_api.py`,
+Flask Blueprint, `laptop-arama/webhook_app.py`'nin Render servisine ekleniyor).
+Her sitede kategori kartlarından farklı bir `scrape_product(url)` fonksiyonu
+var (site bazlı detaylar için `docs/yapilanlar.md` → "Sistem 1 Genişletmesi").
+Abonelikler `data/price_history.db`'den KASITLI ayrı bir dosyada
+(`data/subscriptions.json`, `core/subscriptions_store.py`) - o dosyayı sadece
+CI, bunu sadece Render yazıyor, çakışma riski yok. Render'ın bu dosyayı git'e
+geri yazması için `core/git_sync.py` (GitHub REST Contents API, `GITHUB_PAT`
+ortam değişkeni Render'da tanımlı olmalı - tanımlı değilse özellik web
+sayfasında çalışır ama eklenen ürünler CI'nin periyodik taramasına yansımaz).
+
 ## Sistem 2: Laptop Arama Botu (`laptop-arama/`, isteğe bağlı)
 
 **Şu an AKTİF olan:** Selanik (Yunanistan) laptop araması, `search_laptops_greece.py`
