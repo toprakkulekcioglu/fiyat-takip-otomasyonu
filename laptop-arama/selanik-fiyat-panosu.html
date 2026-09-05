@@ -207,7 +207,7 @@
 <div id="results"></div>
 
 <footer>
-  En ucuz 5 sonuç gösterilir. Fiyatlar Skroutz.gr'nin canlı fiyat karşılaştırmasından, kur Avrupa Merkez Bankası verisine dayanan Frankfurter API'sinden alınır. Bir tarama 1-3 dakika sürebilir.
+  En ucuz 5 sonuç gösterilir. Fiyatlar Skroutz.gr'nin canlı fiyat karşılaştırmasından, kur Avrupa Merkez Bankası verisine dayanan Frankfurter API'sinden alınır. Bir tarama genelde 2-3 dakika sürer.
 </footer>
 
 <script>
@@ -292,7 +292,7 @@
     currentMode = mode;
     if(polling) clearInterval(polling);
     setButtons(true, mode);
-    setStatus(true, "İstek gönderildi, Skroutz.gr taranıyor…");
+    setStatus(true, "İstek gönderildi, Skroutz.gr taranıyor… (genelde 2-3 dakika sürüyor)");
     document.getElementById('results-count').textContent = '';
 
     try{
