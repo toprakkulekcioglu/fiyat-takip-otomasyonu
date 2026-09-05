@@ -61,8 +61,17 @@ sayfasında çalışır ama eklenen ürünler CI'nin periyodik taramasına yans�
 **Şu an AKTİF olan:** Selanik (Yunanistan) laptop araması, `search_laptops_greece.py`
 üzerinden Skroutz.gr'de. İki ayrı sorgu var, `webhook_app.py`'de mesaj
 içeriğine göre dallanıyor:
-- Mesajda **"ryzen"** geçiyorsa → `search_by_cpu()` - Ryzen AI 9 365+ işlemcili laptoplar
-- Mesajda **"teşekkür"** geçiyorsa → `search_by_gpu()` - RTX 5070 Ti/5080/5090 laptoplar
+- Mesajda **"ryzen"** geçiyorsa → `search_by_cpu()` - Ryzen AI 9 365+ işlemcili,
+  en az 32GB RAM + 1TB SSD'li, oyun laptobu OLMAYAN (bkz. `_GAMING_LINE_KEYWORDS`)
+  taşınabilir/hafif laptoplar
+- Mesajda **"teşekkür"** geçiyorsa → `search_by_gpu()` - RTX 5070 Ti/5080/5090
+  ekran kartlı, özellikle **Zephyrus** (G14/G16) serisi laptoplar
+
+Skroutz kart başlıkları kategoriye göre uzun ("...HX370/32GB/1TB SSD/GeForce
+RTX 5070 Ti/W11 Home) Platinum White (US Keyboard)") ya da kısa
+("Ryzen AI 300-9 HX 370/32GB/1TB)") olabiliyor - RAM/depolama filtresi
+(`_meets_min_specs`) bu yüzden sabit bir "/../ SSD" kalıbına değil, başlıktaki
+ilk iki GB/TB sayısına (sırasıyla RAM, depolama) bakıyor.
 - Başka bir şey yazılırsa → kısa bir yönlendirme mesajı, arama yapılmaz
 
 Sonuç formatı: mani + her laptop için ad, EUR fiyatı, güncel kurla TL

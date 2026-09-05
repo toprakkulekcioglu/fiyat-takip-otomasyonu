@@ -182,7 +182,7 @@ def telegram_webhook():
         return "ok", 200
 
     try:
-        send_message(chat_id, "İstek gönderildi, aranıyor...")
+        send_message(chat_id, "İstek gönderildi, aranıyor... (genelde 2-3 dakika sürüyor)")
     except Exception as e:
         print(f"ACK MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
     threading.Thread(target=handle_greece_query, args=(chat_id, search_fn, baslik), daemon=True).start()

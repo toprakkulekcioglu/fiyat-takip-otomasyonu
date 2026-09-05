@@ -4,8 +4,10 @@ Public, Kotsovolos, Plaisio gibi büyük zincirleri tek yerde topluyor) çeker.
 Otomasyonun (core/) parçası değil, sadece bot tetiklemesiyle çalışır.
 
 İki ayrı arama sunuyor:
-- search_by_gpu(): RTX 5070 Ti / 5080 / 5090 (12GB+ VRAM) ekran kartlı laptoplar
-- search_by_cpu(): Ryzen AI 9 365 ve üstü (365, HX 370, HX 375) işlemcili laptoplar
+- search_by_gpu(): RTX 5070 Ti / 5080 / 5090 (12GB+ VRAM) ekran kartlı, Zephyrus
+  serisi (G14/G16) laptoplar
+- search_by_cpu(): Ryzen AI 9 365 ve üstü (365, HX 370, HX 375), en az 32GB RAM
+  ve en az 1TB SSD'li laptoplar
 
 Not: Skroutz'un robots.txt'i özellikle "ClaudeBot" için ayrı bir bölüm
 içeriyor - temiz kategori/ürün .html sayfalarına izin veriyor, sorgu
@@ -36,6 +38,38 @@ CPU_CATEGORY_URL = "https://www.skroutz.gr/c/25/laptop/f/1201076_1935033/AMD-Ryz
 # 300-345" (AI5, "9" numarası yok) gibi daha düşük katmanları da döndürüyor -
 # bu regex sadece AI9 katmanını (365/HX370/HX375) ayıklıyor.
 _RYZEN_AI9_PATTERN = re.compile(r"ryzen ai (?:300-)?9\b", re.IGNORECASE)
+_ZEPHYRUS_PATTERN = re.compile(r"zephyrus", re.IGNORECASE)
+
+# Skroutz ürün adında geçen "GB"/"TB" birimli sayılar hep aynı sırada: önce RAM,
+# hemen ardından depolama (kategoriye göre "32GB/1TB SSD/..." ya da kısaltılmış
+# "32GB/1TB)" hâlinde olabiliyor - ikisi de aynı iki sayı sırasını izliyor, bu
+# yüzden sabit bir "/../ SSD" kalıbı yerine ilk iki GB/TB sayısını alıyoruz.
+_SIZE_TOKEN_PATTERN = re.compile(r"(\d+(?:[.,]\d+)?)\s*(GB|TB)", re.IGNORECASE)
+
+# search_by_cpu() "taşınabilir/hafif" bir ultrabook arıyor - ama Ryzen AI 9 CPU
+# kategorisi hem ultrabook'ları hem oyun laptoplarını (ki ağır ve büyük olur)
+# birlikte listeliyor, kart başlıklarında da "gaming" gibi bir alan yok. Bilinen
+# oyun laptop serisi isimlerini eleyerek ayırıyoruz.
+_GAMING_LINE_KEYWORDS = (
+    "nitro", "predator", "stealth", "raider", "vector", "titan", "katana",
+    "legion", "omen", "rog ", "helios", "sword", "crosshair",
+)
+
+
+def _is_gaming_laptop(name: str) -> bool:
+    lowered = name.lower()
+    return any(keyword in lowered for keyword in _GAMING_LINE_KEYWORDS)
+
+
+def _meets_min_specs(name: str, min_ram_gb: int, min_storage_gb: int) -> bool:
+    tokens = _SIZE_TOKEN_PATTERN.findall(name)
+    if len(tokens) < 2:
+        return False
+    ram_value, ram_unit = tokens[0]
+    storage_value, storage_unit = tokens[1]
+    ram_gb = float(ram_value.replace(",", ".")) * (1000 if ram_unit.upper() == "TB" else 1)
+    storage_gb = float(storage_value.replace(",", ".")) * (1000 if storage_unit.upper() == "TB" else 1)
+    return ram_gb >= min_ram_gb and storage_gb >= min_storage_gb
 
 
 def _parse_cards(html: str) -> list[dict]:
@@ -69,8 +103,8 @@ def search_by_gpu() -> list[dict]:
         if isinstance(html, Exception):
             print(f"  {url}: HATA - {html}", flush=True)
             continue
-        found = _parse_cards(html)
-        print(f"  {url}: {len(found)} urun", flush=True)
+        found = [p for p in _parse_cards(html) if _ZEPHYRUS_PATTERN.search(p["name"])]
+        print(f"  {url}: {len(found)} Zephyrus urunu", flush=True)
         for laptop in found:
             if laptop["url"] in seen_urls:
                 continue
@@ -89,7 +123,12 @@ def search_by_cpu() -> list[dict]:
         return []
 
     found = _parse_cards(html)
-    results = [p for p in found if _RYZEN_AI9_PATTERN.search(p["name"])]
+    results = [
+        p for p in found
+        if _RYZEN_AI9_PATTERN.search(p["name"])
+        and _meets_min_specs(p["name"], min_ram_gb=32, min_storage_gb=1000)
+        and not _is_gaming_laptop(p["name"])
+    ]
     print(f"  {CPU_CATEGORY_URL}: {len(found)} urun (filtre sonrasi {len(results)})", flush=True)
 
     results.sort(key=lambda r: r["price_eur"])
