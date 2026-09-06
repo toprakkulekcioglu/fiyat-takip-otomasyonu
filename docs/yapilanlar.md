@@ -306,6 +306,27 @@ polling sistemi (`telegram_bot.py`, `laptop-bot.yml` workflow'u) tamamen
 kaldırıldı çünkü Telegram bir bota aynı anda hem webhook hem polling
 kullandırmıyor.
 
+### 8. Selanik / Türkiye SSD fiyat karşılaştırması
+
+Kullanıcı "Selanik'te SSD fiyatları TR'den ucuz mu?" diye sorunca, Sistem
+2'ye (laptop-arama/) üçüncü bir arama eklendi: `search_ssd_greece.py`,
+Skroutz.gr'de 1TB NVMe, 2TB NVMe ve 2TB harici SSD kategorilerini tarayıp en
+ucuz fiyatı buluyor, Sistem 1'in (core/storage.py) Türkiye'de son 24 saatte
+bulduğu en ucuz fiyatla karşılaştırıyor.
+
+**Önemli tasarım kararı:** Ürün bazlı (aynı SKU'yu iki ülkede de bulup)
+eşleştirme YAPILMADI - Yunanistan ve Türkiye'de satılan SSD markaları büyük
+ölçüde farklı, böyle bir eşleştirme güvenilmez olurdu. Bunun yerine
+**kapasite bazlı** karşılaştırma yapıldı (1TB'a karşı 1TB, markadan bağımsız)
+- kullanıcının asıl sorusuna ("hangisi ucuz") daha dürüst bir cevap.
+
+Bu, Sistem 2'nin Sistem 1'in verisine SADECE OKUYAN ilk bağlantısı -
+`storage.py`'ye eklenen `get_current_min_price()` fonksiyonu dışında hiçbir
+şey paylaşılmıyor, Sistem 1'in kendi tablosuna hiçbir şey yazılmıyor (iki
+sistemin birbirinden bağımsız kalması ilkesi korundu).
+
+Telegram'da "ssd" yazınca, web sayfasında üçüncü bir buton olarak tetikleniyor.
+
 ---
 
 ## Özet: Neyi ne için kullandık
