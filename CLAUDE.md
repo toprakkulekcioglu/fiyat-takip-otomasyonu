@@ -66,6 +66,13 @@ içeriğine göre dallanıyor:
   taşınabilir/hafif laptoplar
 - Mesajda **"teşekkür"** geçiyorsa → `search_by_gpu()` - RTX 5070 Ti/5080/5090
   ekran kartlı, özellikle **Zephyrus** (G14/G16) serisi laptoplar
+- Mesajda **"ssd"** geçiyorsa → `search_ssd_greece.compare_all()` - Selanik'teki
+  güncel SSD fiyatlarını (1TB/2TB NVMe, 2TB harici) Sistem 1'in (core/) o an
+  Türkiye'de bulduğu en ucuz fiyatla karşılaştırır. Ürün bazlı eşleştirme
+  YAPMIYOR (TR/GR'de satılan markalar çok farklı, güvenilmez olurdu) - sadece
+  kapasite bazlı "hangisi ucuz" karşılaştırması. Bu, Sistem 2'nin core/'daki
+  `storage.get_current_min_price()`'ı SADECE OKUYAN tek noktası - Sistem 1'in
+  kendi verisine hiçbir şey yazmıyor.
 
 Skroutz kart başlıkları kategoriye göre uzun ("...HX370/32GB/1TB SSD/GeForce
 RTX 5070 Ti/W11 Home) Platinum White (US Keyboard)") ya da kısa

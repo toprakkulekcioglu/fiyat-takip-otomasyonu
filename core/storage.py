@@ -95,3 +95,17 @@ def get_latest_price(site: str, url: str, db_path: Path = DEFAULT_DB_PATH) -> fl
         )
         row = cursor.fetchone()
         return row[0] if row else None
+
+
+def get_current_min_price(capacity: str, hours: int = 24, db_path: Path = DEFAULT_DB_PATH) -> float | None:
+    """Son `hours` saat içinde bir kapasite için Türkiye'de bulunan en ucuz
+    fiyatı döner (hangi site/ürün olduğuna bakmaksızın) - Selanik karşılaştırması
+    için "Türkiye'de şu an en ucuzu ne kadar" sorusuna cevap veriyor."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    with closing(_connect(db_path)) as conn:
+        cursor = conn.execute(
+            "SELECT MIN(price) FROM price_history WHERE capacity = ? AND scraped_at >= ?",
+            (capacity, cutoff),
+        )
+        row = cursor.fetchone()
+        return row[0] if row and row[0] is not None else None

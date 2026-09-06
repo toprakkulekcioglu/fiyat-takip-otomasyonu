@@ -17,6 +17,8 @@
     --teal-ink:#F2FBF9;
     --amber:#C9701B;
     --amber-ink:#FBF3E9;
+    --slate:#3E5C76;
+    --slate-ink:#EAF0F5;
     --shadow: 0 1px 0 rgba(27,35,33,0.06);
   }
   @media (prefers-color-scheme: dark){
@@ -30,6 +32,8 @@
       --teal-ink:#0B1A17;
       --amber:#F0A857;
       --amber-ink:#241605;
+      --slate:#8AB4D6;
+      --slate-ink:#0E1B24;
       --shadow: 0 1px 0 rgba(0,0,0,0.3);
     }
   }
@@ -43,6 +47,8 @@
     --teal-ink:#0B1A17;
     --amber:#F0A857;
     --amber-ink:#241605;
+    --slate:#8AB4D6;
+    --slate-ink:#0E1B24;
     --shadow: 0 1px 0 rgba(0,0,0,0.3);
   }
 
@@ -99,6 +105,9 @@
   }
   .mode-btn.cpu .chip{ background:var(--amber-ink); color:var(--amber); }
   .mode-btn.gpu .chip{ background:var(--teal-ink); color:var(--teal); }
+  .mode-btn.ssd .chip{ background:var(--slate-ink); color:var(--slate); }
+  .mode-btn.ssd{ grid-column:1 / -1; flex-direction:row; align-items:center; }
+  .mode-btn.ssd .m-text{ display:flex; flex-direction:column; gap:2px; }
   .mode-btn .m-title{ font-weight:600; font-size:14.5px; line-height:1.3; }
   .mode-btn .m-sub{ font-size:12px; color:var(--muted); }
   .mode-btn[disabled]{ opacity:.55; cursor:default; }
@@ -157,6 +166,40 @@
     text-decoration:none; font-size:16px;
   }
 
+  .compare-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:10px; box-shadow:var(--shadow);
+  }
+  .compare-head{
+    display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    margin-bottom:10px;
+  }
+  .compare-head .cap-label{ font-weight:600; font-size:14px; }
+  .verdict{
+    font-size:11px; font-weight:600; white-space:nowrap;
+    padding:3px 9px; border-radius:999px; font-family:'Archivo',sans-serif;
+  }
+  .verdict.gr{ background:var(--teal-ink); color:var(--teal); }
+  .verdict.tr{ background:var(--amber-ink); color:var(--amber); }
+  .verdict.na{ background:var(--paper); color:var(--muted); border:1px solid var(--line); }
+  .compare-cols{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .compare-col .place{
+    font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:4px; display:block;
+  }
+  .compare-col .cprice{
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px;
+    display:block; font-variant-numeric:tabular-nums;
+  }
+  .compare-col .csub{
+    font-size:11px; color:var(--muted); margin-top:3px; display:block;
+    line-height:1.4;
+  }
+  .compare-card a.go-sm{
+    display:inline-block; margin-top:10px; font-size:12px; color:var(--muted);
+    text-decoration:none; border-bottom:1px solid var(--line);
+  }
+
   .empty, .error{
     font-size:13.5px; color:var(--muted); padding:16px 4px;
   }
@@ -192,6 +235,13 @@
     <span class="chip">RTX</span>
     <span class="m-title">RTX 5070 Ti / 5080 / 5090</span>
     <span class="m-sub">12GB+ ekran kartı belleği</span>
+  </button>
+  <button class="mode-btn ssd" id="btn-ssd" onclick="runSearch('ssd')">
+    <span class="chip">SSD</span>
+    <span class="m-text">
+      <span class="m-title">Selanik / Türkiye SSD karşılaştırma</span>
+      <span class="m-sub">1TB, 2TB ve 2TB harici SSD fiyatları yan yana</span>
+    </span>
   </button>
 </div>
 
@@ -237,6 +287,14 @@
         {name:"Asus ROG Strix G16 16\" (Ryzen 9-8940HX/16GB/1TB) — RTX 5070 Ti", price_eur:2229.37, price_try:125138.71, url:"https://www.skroutz.gr/s/63008827/"},
         {name:"MSI Vector 16 HX AI A2XWHG 16\" (Ultra 7-255HX) — RTX 5070 Ti", price_eur:2389.00, price_try:134100.86, url:"https://www.skroutz.gr/s/61011647/"}
       ]
+    },
+    ssd: {
+      rate: 56.2995,
+      rows: [
+        {capacity:"1tb", label:"1TB NVMe SSD", greek_name:"Patriot P300 1TB M.2 P300P1TBM28", greek_price_eur:149.79, greek_price_try:8433.10, greek_url:"https://www.skroutz.gr/s/23795942/", tr_price_try:6969.24},
+        {capacity:"2tb", label:"2TB NVMe SSD", greek_name:"Crucial E100 M.2 E100SSD8", greek_price_eur:232.80, greek_price_try:13106.52, greek_url:"https://www.skroutz.gr/s/61800397/", tr_price_try:14479.91},
+        {capacity:"2tb-harici", label:"2TB Harici/Taşınabilir SSD", greek_name:"Kingston XS1000 USB-C 3.2 SSD 1.8\"", greek_price_eur:221.79, greek_price_try:12486.67, greek_url:"https://www.skroutz.gr/s/55358979/", tr_price_try:10385.00}
+      ]
     }
   };
 
@@ -248,6 +306,9 @@
   }
   function fmtTry(v){
     return "~" + new Intl.NumberFormat('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}).format(v) + " TL";
+  }
+  function fmtTl(v){
+    return new Intl.NumberFormat('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}).format(v) + " TL";
   }
 
   function renderResults(data, isExample){
@@ -275,6 +336,50 @@
     `).join('');
   }
 
+  function renderSsdResults(data, isExample){
+    document.getElementById('results-title').textContent = "Selanik / Türkiye SSD karşılaştırması";
+    const countEl = document.getElementById('results-count');
+    countEl.innerHTML = `${data.rows.length} kapasite` + (isExample ? ' <span class="example-flag">Örnek</span>' : '');
+
+    const wrap = document.getElementById('results');
+    wrap.innerHTML = data.rows.map(row => {
+      const hasGreek = row.greek_price_try != null;
+      const hasTr = row.tr_price_try != null;
+      let verdictHtml = '<span class="verdict na">Karşılaştırılamadı</span>';
+      if(hasGreek && hasTr){
+        const grCheaper = row.greek_price_try < row.tr_price_try;
+        const base = grCheaper ? row.tr_price_try : row.greek_price_try;
+        const diff = Math.abs(row.greek_price_try - row.tr_price_try) / base * 100;
+        verdictHtml = `<span class="verdict ${grCheaper ? 'gr' : 'tr'}">${grCheaper ? 'Selanik' : 'Türkiye'} ~%${diff.toFixed(0)} ucuz</span>`;
+      }
+      return `
+        <div class="compare-card">
+          <div class="compare-head">
+            <span class="cap-label">${row.label}</span>
+            ${verdictHtml}
+          </div>
+          <div class="compare-cols">
+            <div class="compare-col">
+              <span class="place">Selanik</span>
+              ${hasGreek ? `
+                <span class="cprice">${fmtTl(row.greek_price_try)}</span>
+                <span class="csub">${fmtEur(row.greek_price_eur)} · ${row.greek_name}</span>
+              ` : `<span class="csub">Şu an bulunamadı</span>`}
+            </div>
+            <div class="compare-col">
+              <span class="place">Türkiye</span>
+              ${hasTr ? `
+                <span class="cprice">${fmtTl(row.tr_price_try)}</span>
+                <span class="csub">Son 24 saatte en ucuz</span>
+              ` : `<span class="csub">Veri yok</span>`}
+            </div>
+          </div>
+          ${hasGreek ? `<a class="go-sm" href="${row.greek_url}" target="_blank" rel="noopener">Selanik'teki ürünü gör ↗</a>` : ``}
+        </div>
+      `;
+    }).join('');
+  }
+
   function setStatus(show, text){
     const s = document.getElementById('status');
     s.classList.toggle('show', show);
@@ -282,10 +387,11 @@
   }
 
   function setButtons(disabled, activeMode){
-    document.getElementById('btn-cpu').disabled = disabled;
-    document.getElementById('btn-gpu').disabled = disabled;
-    document.getElementById('btn-cpu').classList.toggle('active', activeMode === 'cpu');
-    document.getElementById('btn-gpu').classList.toggle('active', activeMode === 'gpu');
+    ['cpu','gpu','ssd'].forEach(mode => {
+      const btn = document.getElementById('btn-' + mode);
+      btn.disabled = disabled;
+      btn.classList.toggle('active', activeMode === mode);
+    });
   }
 
   async function runSearch(mode){
@@ -327,7 +433,11 @@
             document.getElementById('results').innerHTML = `<div class="error">Bir hata oldu: ${job.data}</div>`;
             return;
           }
-          renderResults({title: job.data.baslik, rate: job.data.rate, total: job.data.total, laptops: job.data.laptops}, false);
+          if(mode === 'ssd'){
+            renderSsdResults({rate: job.data.rate, rows: job.data.rows}, false);
+          }else{
+            renderResults({title: job.data.baslik, rate: job.data.rate, total: job.data.total, laptops: job.data.laptops}, false);
+          }
           document.getElementById('rate-val').textContent = job.data.rate.toFixed(4);
         }catch(e){
           clearInterval(polling);

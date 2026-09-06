@@ -20,11 +20,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from bs4 import BeautifulSoup
-
+from _skroutz_cards import parse_cards as _parse_cards
 from scrapers._browser import fetch_multiple_rendered_html
-from scrapers._price import parse_try
 
 GPU_CATEGORY_URLS = [
     "https://www.skroutz.gr/c/25/laptop/f/2000033/GeForce-RTX-5070-Ti.html",
@@ -70,27 +69,6 @@ def _meets_min_specs(name: str, min_ram_gb: int, min_storage_gb: int) -> bool:
     ram_gb = float(ram_value.replace(",", ".")) * (1000 if ram_unit.upper() == "TB" else 1)
     storage_gb = float(storage_value.replace(",", ".")) * (1000 if storage_unit.upper() == "TB" else 1)
     return ram_gb >= min_ram_gb and storage_gb >= min_storage_gb
-
-
-def _parse_cards(html: str) -> list[dict]:
-    soup = BeautifulSoup(html, "html.parser")
-    results = []
-    for card in soup.select("li.card[data-skuid]"):
-        name_el = card.select_one("a.js-sku-link.pic")
-        price_el = card.select_one("a.js-sku-link.sku-link")
-        if not name_el or not price_el:
-            continue
-        name = name_el.get("title", "").strip()
-        price = parse_try(price_el.get_text())
-        href = name_el.get("href", "").split("?")[0]
-        if not name or price is None or not href:
-            continue
-        results.append({
-            "name": name,
-            "price_eur": price,
-            "url": "https://www.skroutz.gr" + href,
-        })
-    return results
 
 
 def search_by_gpu() -> list[dict]:

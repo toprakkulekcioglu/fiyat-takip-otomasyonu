@@ -10,6 +10,8 @@ kullanmana izin vermiyor.
 Anahtar kelimeyle dallanma:
 - "ryzen" geçen mesaj  -> Selanik (Yunanistan), Ryzen AI 9 365+ işlemcili laptoplar
 - "teşekkür" geçen mesaj -> Selanik (Yunanistan), RTX 5070 Ti/5080/5090 laptoplar
+- "ssd" geçen mesaj -> Selanik'teki güncel SSD fiyatlarını Türkiye'de Sistem 1'in
+  (core/) takip ettiği fiyatlarla karşılaştırır (bkz. search_ssd_greece.py)
 - Diğer her şey -> kısa bir yönlendirme mesajı
 
 Not: Eski sistem (Türkiye vs. yurtdışı/İngiltere PriceRunner karşılaştırması,
@@ -34,6 +36,7 @@ from manis import rastgele_mani
 from notifier import load_dotenv
 from search_laptops_greece import search_by_cpu as greece_search_by_cpu
 from search_laptops_greece import search_by_gpu as greece_search_by_gpu
+from search_ssd_greece import compare_all as ssd_compare_all
 from subscription_api import subscription_api
 
 load_dotenv()
@@ -108,6 +111,34 @@ def format_greece_results(laptops: list[dict], rate: float, baslik: str) -> str:
     return "\n".join(lines)
 
 
+def format_ssd_comparison(rows: list[dict], rate: float) -> str:
+    lines = [rastgele_mani(), "", "Selanik - Türkiye SSD Fiyat Karşılaştırması", ""]
+
+    for row in rows:
+        lines.append(row["label"])
+        greek = row["greek"]
+        tr_price = row["tr_price_try"]
+        greek_try = greek["price_eur"] * rate if greek else None
+
+        if greek:
+            lines.append(f"Selanik: {greek['price_eur']:,.2f} EUR  (~{greek_try:,.2f} TL) - {greek['name']}")
+        else:
+            lines.append("Selanik: şu an bir sonuç bulunamadı")
+
+        if tr_price is not None:
+            lines.append(f"Türkiye (son 24 saatte en ucuz): {tr_price:,.2f} TL")
+        else:
+            lines.append("Türkiye: veri yok")
+
+        if greek_try is not None and tr_price is not None:
+            cheaper, diff_pct = ("Selanik", (tr_price - greek_try) / tr_price * 100) if greek_try < tr_price \
+                else ("Türkiye", (greek_try - tr_price) / greek_try * 100)
+            lines.append(f"→ {cheaper} yaklaşık %{diff_pct:.0f} daha ucuz")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 _search_lock = threading.Lock()
 
 
@@ -149,6 +180,34 @@ def handle_greece_query(chat_id: str, search_fn, baslik: str) -> None:
         _search_lock.release()
 
 
+def handle_ssd_query(chat_id: str) -> None:
+    """handle_greece_query ile aynı kilit/hata deseni, ama farklı veri şekli
+    (kapasite başına Selanik+Türkiye karşılaştırması) olduğu için ayrı fonksiyon."""
+    if not _search_lock.acquire(blocking=False):
+        print(f"Baska bir arama surerken SSD sorgusu geldi ({chat_id}) - bekletiliyor.", flush=True)
+        try:
+            send_message(chat_id, "Şu anda başka bir arama sürüyor, senin sıran gelince otomatik başlayacak...")
+        except Exception as e:
+            print(f"BEKLEME MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
+        _search_lock.acquire()
+
+    try:
+        rows = ssd_compare_all()
+        print("SSD karsilastirmasi tamamlandi", flush=True)
+        rate = eur_to_try_rate()
+        text = format_ssd_comparison(rows, rate)
+        send_long_message(chat_id, text)
+        print("Mesaj gonderildi.", flush=True)
+    except Exception as e:
+        print(f"HANDLE_SSD_QUERY HATASI: {type(e).__name__}: {e}", flush=True)
+        try:
+            send_message(chat_id, f"Bir hata oldu, tekrar dener misin? ({e})")
+        except Exception as e2:
+            print(f"HATA MESAJI DA GONDERILEMEDI: {type(e2).__name__}: {e2}", flush=True)
+    finally:
+        _search_lock.release()
+
+
 @app.route("/telegram-webhook", methods=["POST"])
 def telegram_webhook():
     update = request.get_json(silent=True) or {}
@@ -166,16 +225,19 @@ def telegram_webhook():
     lowered = text.lower()
 
     if "ryzen" in lowered:
-        search_fn, baslik = greece_search_by_cpu, "Selanik - Ryzen AI 9 365+ işlemcili laptoplar"
+        target = lambda: handle_greece_query(chat_id, greece_search_by_cpu, "Selanik - Ryzen AI 9 365+ işlemcili laptoplar")
     elif "teşekkür" in lowered or "tesekkur" in lowered:
-        search_fn, baslik = greece_search_by_gpu, "Selanik - RTX 5070 Ti/5080/5090 laptoplar"
+        target = lambda: handle_greece_query(chat_id, greece_search_by_gpu, "Selanik - RTX 5070 Ti/5080/5090 laptoplar")
+    elif "ssd" in lowered:
+        target = lambda: handle_ssd_query(chat_id)
     else:
         try:
             send_message(
                 chat_id,
                 "Ne aramamı istediğini anlamadım.\n\n"
                 "'ryzen' yaz: Ryzen AI 9 365+ işlemcili laptoplar (Selanik)\n"
-                "'teşekkür' yaz: RTX 5070 Ti/5080/5090 laptoplar (Selanik)",
+                "'teşekkür' yaz: RTX 5070 Ti/5080/5090 laptoplar (Selanik)\n"
+                "'ssd' yaz: Selanik'teki SSD fiyatlarını Türkiye ile karşılaştır",
             )
         except Exception as e:
             print(f"YONLENDIRME MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
@@ -185,7 +247,7 @@ def telegram_webhook():
         send_message(chat_id, "İstek gönderildi, aranıyor... (genelde 2-3 dakika sürüyor)")
     except Exception as e:
         print(f"ACK MESAJI GONDERILEMEDI: {type(e).__name__}: {e}", flush=True)
-    threading.Thread(target=handle_greece_query, args=(chat_id, search_fn, baslik), daemon=True).start()
+    threading.Thread(target=target, daemon=True).start()
     return "ok", 200
 
 
@@ -215,6 +277,30 @@ def _run_web_search(job_id: str, search_fn, baslik: str) -> None:
             _jobs[job_id] = {"status": "error", "data": str(e)}
 
 
+def _run_ssd_web_search(job_id: str) -> None:
+    with _search_lock:
+        try:
+            rows = ssd_compare_all()
+            print(f"[web] SSD karsilastirmasi tamamlandi", flush=True)
+            rate = eur_to_try_rate()
+            data_rows = []
+            for row in rows:
+                greek = row["greek"]
+                data_rows.append({
+                    "capacity": row["capacity"],
+                    "label": row["label"],
+                    "greek_name": greek["name"] if greek else None,
+                    "greek_price_eur": greek["price_eur"] if greek else None,
+                    "greek_price_try": round(greek["price_eur"] * rate, 2) if greek else None,
+                    "greek_url": greek["url"] if greek else None,
+                    "tr_price_try": row["tr_price_try"],
+                })
+            _jobs[job_id] = {"status": "done", "data": {"rate": rate, "rows": data_rows}}
+        except Exception as e:
+            print(f"[web] SSD ARAMA HATASI: {type(e).__name__}: {e}", flush=True)
+            _jobs[job_id] = {"status": "error", "data": str(e)}
+
+
 def _cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
@@ -232,8 +318,13 @@ def api_search():
         search_fn, baslik = greece_search_by_cpu, "Ryzen AI 9 365+ işlemcili laptoplar (Selanik)"
     elif kind == "gpu":
         search_fn, baslik = greece_search_by_gpu, "RTX 5070 Ti/5080/5090 laptoplar (Selanik)"
+    elif kind == "ssd":
+        job_id = str(uuid.uuid4())
+        _jobs[job_id] = {"status": "running", "data": None}
+        threading.Thread(target=_run_ssd_web_search, args=(job_id,), daemon=True).start()
+        return _cors(jsonify({"job_id": job_id}))
     else:
-        return _cors(jsonify({"error": "type 'cpu' veya 'gpu' olmalı"})), 400
+        return _cors(jsonify({"error": "type 'cpu', 'gpu' veya 'ssd' olmalı"})), 400
 
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {"status": "running", "data": None}
